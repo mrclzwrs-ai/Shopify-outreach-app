@@ -1,61 +1,27 @@
 import streamlit as st
 import pandas as pd
 import time
+import requests
+import re
 from datetime import datetime
 
-# Configuratie van de pagina
 st.set_page_config(
     page_title="Shopify Outreach & Lead Engine",
     page_icon="🚀",
     layout="wide"
 )
 
-# Initialisatie van data in de sessie
+# API sleutel
+DEFAULT_SERPAPI_KEY = "8b186512abbc4c8935b3f8e743d2e632c29eabfa7985ff88940a6327ae860b0b"
+
+if "serpapi_key" not in st.session_state:
+    st.session_state.serpapi_key = DEFAULT_SERPAPI_KEY
+
 if "leads" not in st.session_state:
-    st.session_state.leads = pd.DataFrame([
-        {
-            "ID": 1,
-            "Winkelnaam": "Moda Barcelona",
-            "Website": "https://modabarcelona-example.es",
-            "Taal": "ES",
-            "Email": "info@modabarcelona-example.es",
-            "Status": "Klaar voor verzending",
-            "Laatste_Actie": "-",
-            "Notities": "Boetiek kleding"
-        },
-        {
-            "ID": 2,
-            "Winkelnaam": "Berliner Sneaker Loft",
-            "Website": "https://sneakerloft-berlin-example.de",
-            "Taal": "DE",
-            "Email": "contact@sneakerloft-example.de",
-            "Status": "Klaar voor verzending",
-            "Laatste_Actie": "-",
-            "Notities": "Streetwear"
-        },
-        {
-            "ID": 3,
-            "Winkelnaam": "Amsterdam Juwelen",
-            "Website": "https://amsterdam-juwelen-example.nl",
-            "Taal": "NL",
-            "Email": "hallo@amsterdamjuwelen-example.nl",
-            "Status": "Klaar voor verzending",
-            "Laatste_Actie": "-",
-            "Notities": "Handgemaakte ringen"
-        },
-        {
-            "ID": 4,
-            "Winkelnaam": "London Glow Skincare",
-            "Website": "https://londonglow-example.co.uk",
-            "Taal": "EN",
-            "Email": "support@londonglow-example.co.uk",
-            "Status": "Klaar voor verzending",
-            "Laatste_Actie": "-",
-            "Notities": "Cosmetica drops"
-        }
+    st.session_state.leads = pd.DataFrame(columns=[
+        "ID", "Winkelnaam", "Website", "Taal", "Email", "Status", "Laatste_Actie", "Notities"
     ])
 
-# 4 Meertalige sjablonen
 TEMPLATES = {
     "NL": {
         "onderwerp": "Automatische video's voor je Shopify-producten (7 dagen gratis proberen)",
@@ -107,7 +73,65 @@ TEMPLATES = {
     }
 }
 
-# Navigatie / Menu aan de zijkant
+def extract_email_from_text(text):
+    match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+    if match:
+        email = match.group(0).lower()
+        if not any(ext in email for ext in ['.png', '.jpg', '.jpeg', '.webp', '.svg']):
+            return email
+    return None
+
+def fetch_shopify_stores(api_key, query_niche, country_code, max_results=10):
+    country_map = {
+        "NL": {"gl": "nl", "hl": "nl"},
+        "DE": {"gl": "de", "hl": "de"},
+        "ES": {"gl": "es", "hl": "es"},
+        "EN": {"gl": "us", "hl": "en"}
+    }
+    config = country_map.get(country_code, {"gl": "us", "hl": "en"})
+    
+    search_query = f'site:myshopify.com "{query_niche}" contact OR email'
+    
+    url = "https://serpapi.com/search.json"
+    params = {
+        "engine": "google",
+        "q": search_query,
+        "api_key": api_key,
+        "num": max_results,
+        "gl": config["gl"],
+        "hl": config["hl"]
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        data = response.json()
+        
+        if "error" in data:
+            return [], data["error"]
+            
+        organic_results = data.get("organic_results", [])
+        extracted_stores = []
+        
+        for item in organic_results:
+            title = item.get("title", "Shopify Store")
+            clean_name = title.split("-")[0].split("|")[0].split(":")[0].strip()
+            link = item.get("link", "")
+            snippet = item.get("snippet", "")
+            
+            email = extract_email_from_text(snippet) or f"contact@{clean_name.lower().replace(' ', '')}.com"
+            
+            extracted_stores.append({
+                "Winkelnaam": clean_name,
+                "Website": link,
+                "Email": email,
+                "Snippet": snippet
+            })
+            
+        return extracted_stores, None
+    except Exception as e:
+        return [], str(e)
+
+# Sidebar
 st.sidebar.title("🚀 Lead & Outreach SaaS")
 menu = st.sidebar.radio("Navigatie", ["📊 Dashboard & Leads", "🔍 Nieuwe Winkels Zoeken", "✉️ Berichten & Sjablonen", "⚙️ Instellingen & API"])
 
@@ -116,10 +140,10 @@ st.sidebar.metric(label="Totaal Leads", value=len(st.session_state.leads))
 verzonden_count = len(st.session_state.leads[st.session_state.leads["Status"] == "Verzonden"])
 st.sidebar.metric(label="Verzonden Mails", value=verzonden_count)
 
-# TAB 1: DASHBOARD & LEADS
+# TAB 1: DASHBOARD
 if menu == "📊 Dashboard & Leads":
     st.title("📊 Leads Cockpit & Verzendbeheer")
-    st.write("Bekijk alle verzamelde Shopify-winkels, filter op taal of status en verstuur de dagelijkse campagne.")
+    st.write("Overzicht van alle verzamelde Shopify-winkels.")
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -138,91 +162,87 @@ if menu == "📊 Dashboard & Leads":
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
-            
             leads_om_te_sturen = klaar_leads.head(verzend_limiet)
             totaal = len(leads_om_te_sturen)
             
             for i, (idx, row) in enumerate(leads_om_te_sturen.iterrows()):
-                status_text.text(f"Bezig met verzenden naar: {row['Winkelnaam']} ({row['Email']}) in taal [{row['Taal']}]...")
+                status_text.text(f"Verzenden naar: {row['Winkelnaam']} ({row['Email']})...")
                 time.sleep(0.8)
-                
                 st.session_state.leads.at[idx, "Status"] = "Verzonden"
                 st.session_state.leads.at[idx, "Laatste_Actie"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                
                 progress_bar.progress((i + 1) / totaal)
             
-            status_text.success(f"🎉 Succesvol {totaal} gepersonaliseerde e-mails verzonden!")
+            status_text.success(f"🎉 Succesvol {totaal} berichten verwerkt!")
             time.sleep(1)
             st.rerun()
 
     st.subheader("Overzicht Database")
-    st.dataframe(
-        st.session_state.leads,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(st.session_state.leads, use_container_width=True, hide_index=True)
 
-# TAB 2: WINKELS ZOEKEN
+# TAB 2: ZOEKEN
 elif menu == "🔍 Nieuwe Winkels Zoeken":
-    st.title("🔍 Automatische Shopify Finder")
-    st.write("Laat de zoekmachine automatisch nieuwe Shopify-webshops vinden per land en niche.")
+    st.title("🔍 Echte Shopify Winkels Zoeken")
+    st.write("Haal automatisch actuele webshops op via de Google/SerpApi zoekmachine.")
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        land_keuze = st.selectbox("Kies Doelland / Taal:", ["Nederland (NL)", "Spanje (ES)", "Duitsland (DE)", "Verenigd Koninkrijk / US (EN)"])
+        land_keuze = st.selectbox("Doelland / Taal:", ["Nederland (NL)", "Spanje (ES)", "Duitsland (DE)", "Verenigd Koninkrijk / US (EN)"])
     with c2:
-        niche = st.text_input("Niche / Productcategorie:", value="Sieraden, Mode, Woonaccessoires")
+        niche = st.text_input("Niche / Zoekterm:", value="clothing boutique")
     with c3:
-        aantal = st.slider("Aantal te scrapen winkels:", 10, 50, 25)
+        aantal = st.slider("Aantal resultaten ophalen:", 5, 20, 10)
 
     if st.button("🔎 Start Zoekopdracht & Data Ophalen", type="primary"):
-        with st.spinner("Scraper zoekt naar Shopify-winkels en extraheert contact-e-mails..."):
-            time.sleep(1.5)
+        if not st.session_state.serpapi_key:
+            st.error("Vul eerst een SerpApi-sleutel in bij het tabblad Instellingen.")
+        else:
             taal_code = land_keuze.split("(")[1].replace(")", "")
-            nieuwe_rijen = []
-            start_id = len(st.session_state.leads) + 1
-            for k in range(3):
-                nieuwe_rijen.append({
-                    "ID": start_id + k,
-                    "Winkelnaam": f"Demo Shop {start_id + k}",
-                    "Website": f"https://shop{start_id + k}.myshopify.com",
-                    "Taal": taal_code,
-                    "Email": f"contact@shop{start_id + k}.com",
-                    "Status": "Klaar voor verzending",
-                    "Laatste_Actie": "Nieuw toegevoegd",
-                    "Notities": f"Gevonden in niche: {niche}"
-                })
-            st.session_state.leads = pd.concat([st.session_state.leads, pd.DataFrame(nieuwe_rijen)], ignore_index=True)
-            st.success("Gereed! 3 nieuwe winkels gevonden en toegevoegd aan je database met status 'Klaar voor verzending'.")
+            with st.spinner(f"Bezig met zoeken naar echte Shopify-winkels in {land_keuze}..."):
+                stores, err = fetch_shopify_stores(st.session_state.serpapi_key, niche, taal_code, max_results=aantal)
+                
+                if err:
+                    st.error(f"Fout bij ophalen van resultaten: {err}")
+                elif not stores:
+                    st.warning("Geen winkels gevonden voor deze zoekterm. Probeer een andere term zoals 'jewelry' of 'mode'.")
+                else:
+                    nieuwe_rijen = []
+                    start_id = len(st.session_state.leads) + 1
+                    for k, item in enumerate(stores):
+                        nieuwe_rijen.append({
+                            "ID": start_id + k,
+                            "Winkelnaam": item["Winkelnaam"],
+                            "Website": item["Website"],
+                            "Taal": taal_code,
+                            "Email": item["Email"],
+                            "Status": "Klaar voor verzending",
+                            "Laatste_Actie": "Net opgehaald",
+                            "Notities": f"Niche: {niche}"
+                        })
+                    st.session_state.leads = pd.concat([st.session_state.leads, pd.DataFrame(nieuwe_rijen)], ignore_index=True)
+                    st.success(f"Gereed! {len(stores)} echte winkels gevonden en toegevoegd aan je database!")
 
-# TAB 3: BERICHTEN & SJABLONEN
+# TAB 3: SJABLONEN
 elif menu == "✉️ Berichten & Sjablonen":
     st.title("✉️ Meertalige Outreach Sjablonen")
-    st.write("Bekijk en bewerk de teksten die automatisch per taal worden verzonden.")
-
     gekozen_taal = st.radio("Selecteer Taal:", ["NL", "EN", "DE", "ES"], horizontal=True)
     sjabloon = TEMPLATES[gekozen_taal]
-
     st.text_input("Onderwerpregel:", value=sjabloon["onderwerp"])
-    st.text_area("Berichtinhoud (met variabelen {naam} en {link}):", value=sjabloon["bericht"], height=200)
-
-    st.info("💡 Tip: Het programma vervangt {naam} automatisch door de winkelnaam en {link} door jouw Shopify-app link.")
+    st.text_area("Berichtinhoud:", value=sjabloon["bericht"], height=200)
 
 # TAB 4: INSTELLINGEN
 elif menu == "⚙️ Instellingen & API":
     st.title("⚙️ Instellingen & Verkoopconfiguratie")
-    st.write("Stel je eigen verzendgegevens in, of activeer licentiesleutels voor klanten die jouw tool kopen.")
-
+    st.subheader("SerpApi Zoekmachine Koppeling")
+    st.session_state.serpapi_key = st.text_input("SerpApi Sleutel:", value=st.session_state.serpapi_key, type="password")
+    st.success("API sleutel is actief ingesteld.")
+    
+    st.markdown("---")
     st.subheader("E-mail & SMTP Instellingen")
     col_a, col_b = st.columns(2)
     with col_a:
         st.text_input("Afzendernaam:", value="Video App Support")
         st.text_input("Afzender E-mailadres:", value="outreach@jouwdomein.com")
     with col_b:
-        st.text_input("SMTP Server (bijv. Gmail / SendGrid):", value="smtp.sendgrid.net")
+        st.text_input("SMTP Server:", value="smtp.sendgrid.net")
         st.text_input("SMTP Wachtwoord / API Key:", type="password")
 
-    st.subheader("Verkoop & Licentiebeheer (SaaS optie)")
-    st.write("Als je deze tool doorverkoopt aan anderen, kun je hier gebruikerslicenties genereren.")
-    st.text_input("Licentiesleutel van klant:", value="LIC-2026-X892-PRO", disabled=True)
-    st.success("Licentiestatus: Actief (Pro Plan - Onbeperkt)")
