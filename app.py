@@ -311,8 +311,11 @@ elif menu == "⚙️ Instellingen & Verkoop":
     
     st.markdown("---")
     st.subheader("E-mail & SMTP Instellingen")
-    col_a, col_b = st.columns(2)
+        col_a, col_b = st.columns(2)
     with col_a:
         st.session_state.sender_name = st.text_input("Afzendernaam:", value=st.session_state.sender_name)
         st.session_state.smtp_user = st.text_input("Afzender E-mailadres:", value=st.session_state.smtp_user)
-        st.session_state.smtp_password = st.text_input("E-mail App-Wachtwoord (16 tekens
+        st.session_state.smtp_password = st.text_input("E-mail App-Wachtwoord (16 tekens):", value=st.session_state.smtp_password, type="password")
+    with col_b:
+        st.session_state.smtp_server = st.text_input("SMTP Server:", value=st.session_state.smtp_server)
+        st.session_state.smtp_port = st.number_input("SMTP Poort (standaard 465 voor SSL):", value=st.session_state.smtp_port)
