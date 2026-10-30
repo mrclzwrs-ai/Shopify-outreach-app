@@ -6,10 +6,42 @@ import re
 from datetime import datetime
 
 st.set_page_config(
-    page_title="Shopify Outreach & Lead Engine",
+    page_title="Universal Lead & Outreach Engine",
     page_icon="🚀",
     layout="wide"
 )
+
+# iPad-vriendelijke styling voor grotere letters en knoppen
+st.markdown("""
+    <style>
+        html, body, [class*="css"] {
+            font-size: 19px !important;
+        }
+        h1 {
+            font-size: 2.2rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 0.8rem !important;
+        }
+        h2, h3 {
+            font-size: 1.5rem !important;
+            font-weight: 600 !important;
+        }
+        .stButton>button {
+            font-size: 1.15rem !important;
+            padding: 0.6rem 1.2rem !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+        }
+        .stTextInput>div>div>input, .stSelectbox>div>div>div {
+            font-size: 1.1rem !important;
+            padding: 0.5rem !important;
+        }
+        label p {
+            font-size: 1.15rem !important;
+            font-weight: 600 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # API sleutel
 DEFAULT_SERPAPI_KEY = "8b186512abbc4c8935b3f8e743d2e632c29eabfa7985ff88940a6327ae860b0b"
@@ -19,53 +51,53 @@ if "serpapi_key" not in st.session_state:
 
 if "leads" not in st.session_state:
     st.session_state.leads = pd.DataFrame(columns=[
-        "ID", "Winkelnaam", "Website", "Taal", "Email", "Status", "Laatste_Actie", "Notities"
+        "ID", "Winkelnaam", "Platform", "Website", "Taal", "Email", "Status", "Laatste_Actie", "Notities"
     ])
 
 TEMPLATES = {
     "NL": {
-        "onderwerp": "Automatische video's voor je Shopify-producten (7 dagen gratis proberen)",
+        "onderwerp": "Automatische video's voor je webshop (7 dagen gratis proberen)",
         "bericht": (
             "Hoi {naam},\n\n"
             "Ik kwam jullie webshop tegen en zag jullie mooie assortiment! Korte video's op TikTok en Reels "
             "leveren tegenwoordig enorm veel gratis bereik en verkopen op, maar video's editen kost bakken met tijd.\n\n"
-            "Onze Shopify-app maakt automatisch van elk nieuw product direct een video en publiceert die direct op TikTok, Reels en Shorts.\n\n"
+            "Onze software maakt automatisch van elk nieuw product direct een professionele video en publiceert die direct op TikTok, Reels en Shorts.\n\n"
             "Je mag het 7 dagen gratis uitproberen inclusief 3 gratis video's (geen creditcard nodig):\n"
             "{link}\n\n"
             "Met vriendelijke groet,\nHet Team"
         )
     },
     "EN": {
-        "onderwerp": "Automated product videos for your Shopify store (7-day free trial)",
+        "onderwerp": "Automated product videos for your online store (7-day free trial)",
         "bericht": (
             "Hi {naam},\n\n"
             "Loved checking out your store! Short-form video on TikTok and Reels is driving massive organic sales right now, "
             "but editing videos daily takes forever.\n\n"
-            "Our Shopify app automatically turns your new products into high-converting videos and posts them to TikTok, Instagram Reels, and YouTube Shorts for you.\n\n"
+            "Our automated video tool turns your new products into high-converting videos and posts them to TikTok, Instagram Reels, and YouTube Shorts for you.\n\n"
             "You can try it 100% free for 7 days (includes 3 free product videos, no credit card required):\n"
             "{link}\n\n"
             "Best regards,\nThe Team"
         )
     },
     "DE": {
-        "onderwerp": "Automatische Produktvideos für Ihren Shopify-Shop (7 Tage kostenlos testen)",
+        "onderwerp": "Automatische Produktvideos für Ihren Onlineshop (7 Tage kostenlos testen)",
         "bericht": (
             "Hallo {naam},\n\n"
             "ich habe mir Ihren Onlineshop angesehen – tolle Produkte! Kurze Videos auf TikTok und Reels bringen derzeit enorme Reichweite, "
             "die manuelle Erstellung kostet jedoch viel wertvolle Zeit.\n\n"
-            "Unsere Shopify-App erstellt aus jedem neuen Produkt vollautomatisch ansprechende Videos und veröffentlicht sie direkt auf TikTok, Instagram und YouTube.\n\n"
-            "Sie können die App 7 Tage lang unverbindlich testen (inkl. 3 kostenlosen Produktvideos, keine Kreditkarte erforderlich):\n"
+            "Unsere Software erstellt aus jedem neuen Produkt vollautomatisch ansprechende Videos und veröffentlicht sie direkt auf TikTok, Instagram und YouTube.\n\n"
+            "Sie können die Lösung 7 Tage lang unverbindlich testen (inkl. 3 kostenlosen Produktvideos, keine Kreditkarte erforderlich):\n"
             "{link}\n\n"
             "Beste Grüße,\nIhr Team"
         )
     },
     "ES": {
-        "onderwerp": "Vídeos automáticos para tus productos de Shopify (Prueba gratis 7 días)",
+        "onderwerp": "Vídeos automáticos para tu tienda online (Prueba gratis 7 días)",
         "bericht": (
             "¡Hola {naam}!\n\n"
             "Estuve viendo vuestra tienda online y tenéis unos productos increíbles. Los vídeos cortos en TikTok e Instagram Reels generan muchísimo alcance, "
             "pero editar contenido requiere horas de trabajo.\n\n"
-            "Nuestra app para Shopify crea automáticamente un vídeo profesional de cada nuevo producto y lo publica en TikTok, Reels y YouTube Shorts por ti.\n\n"
+            "Nuestra herramienta crea automáticamente un vídeo profesional de cada nuevo producto y lo publica en TikTok, Reels y YouTube Shorts por ti.\n\n"
             "Puedes probarla gratis durante 7 días (incluye 3 vídeos gratis, sin tarjeta de crédito):\n"
             "{link}\n\n"
             "¡Un saludo!\nEl Equipo"
@@ -81,7 +113,7 @@ def extract_email_from_text(text):
             return email
     return None
 
-def fetch_shopify_stores(api_key, query_niche, country_code, max_results=10):
+def fetch_stores(api_key, platform_type, query_niche, country_code, max_results=10):
     country_map = {
         "NL": {"gl": "nl", "hl": "nl"},
         "DE": {"gl": "de", "hl": "de"},
@@ -90,7 +122,16 @@ def fetch_shopify_stores(api_key, query_niche, country_code, max_results=10):
     }
     config = country_map.get(country_code, {"gl": "us", "hl": "en"})
     
-    search_query = f'site:myshopify.com "{query_niche}" contact OR email'
+    if platform_type == "Shopify":
+        platform_filter = 'site:myshopify.com'
+    elif platform_type == "WooCommerce":
+        platform_filter = '"powered by woocommerce" OR inurl:wp-content'
+    elif platform_type == "Lightspeed":
+        platform_filter = 'site:webshopapp.com OR "powered by lightspeed"'
+    else:
+        platform_filter = 'webwinkel OR webshop OR "winkelmandje"'
+
+    search_query = f'{platform_filter} "{query_niche}" contact OR email'
     
     url = "https://serpapi.com/search.json"
     params = {
@@ -113,7 +154,7 @@ def fetch_shopify_stores(api_key, query_niche, country_code, max_results=10):
         extracted_stores = []
         
         for item in organic_results:
-            title = item.get("title", "Shopify Store")
+            title = item.get("title", "Online Winkel")
             clean_name = title.split("-")[0].split("|")[0].split(":")[0].strip()
             link = item.get("link", "")
             snippet = item.get("snippet", "")
@@ -132,8 +173,8 @@ def fetch_shopify_stores(api_key, query_niche, country_code, max_results=10):
         return [], str(e)
 
 # Sidebar
-st.sidebar.title("🚀 Lead & Outreach SaaS")
-menu = st.sidebar.radio("Navigatie", ["📊 Dashboard & Leads", "🔍 Nieuwe Winkels Zoeken", "✉️ Berichten & Sjablonen", "⚙️ Instellingen & API"])
+st.sidebar.title("🚀 Outreach Engine")
+menu = st.sidebar.radio("Navigatie", ["📊 Dashboard & Leads", "🔍 Leads Genereren", "✉️ Berichten & Sjablonen", "⚙️ Instellingen & Verkoop"])
 
 st.sidebar.markdown("---")
 st.sidebar.metric(label="Totaal Leads", value=len(st.session_state.leads))
@@ -143,11 +184,11 @@ st.sidebar.metric(label="Verzonden Mails", value=verzonden_count)
 # TAB 1: DASHBOARD
 if menu == "📊 Dashboard & Leads":
     st.title("📊 Leads Cockpit & Verzendbeheer")
-    st.write("Overzicht van alle verzamelde Shopify-winkels.")
+    st.write("Beheer al je potentiële klanten en start gerichte outreach-campagnes.")
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        app_link = st.text_input("Jouw Shopify App Link:", value="https://apps.shopify.com/jouw-app-link")
+        app_link = st.text_input("Jouw Aanbod / Website Link:", value="https://jouwbedrijf.com/demo")
     with col2:
         verzend_limiet = st.number_input("Aantal te verzenden:", min_value=1, max_value=50, value=10)
     with col3:
@@ -158,7 +199,7 @@ if menu == "📊 Dashboard & Leads":
     if start_knop:
         klaar_leads = st.session_state.leads[st.session_state.leads["Status"] == "Klaar voor verzending"]
         if klaar_leads.empty:
-            st.warning("Er zijn momenteel geen winkels met de status 'Klaar voor verzending'.")
+            st.warning("Er zijn momenteel geen contacten met de status 'Klaar voor verzending'.")
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -180,30 +221,30 @@ if menu == "📊 Dashboard & Leads":
     st.dataframe(st.session_state.leads, use_container_width=True, hide_index=True)
 
 # TAB 2: ZOEKEN
-elif menu == "🔍 Nieuwe Winkels Zoeken":
-    st.title("🔍 Echte Shopify Winkels Zoeken")
-    st.write("Haal automatisch actuele webshops op via de Google/SerpApi zoekmachine.")
+elif menu == "🔍 Leads Genereren":
+    st.title("🔍 Leads Genereren")
+    st.write("Vind automatisch winkels binnen elk gewenst platform, land en markt.")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
-        land_keuze = st.selectbox("Doelland / Taal:", ["Nederland (NL)", "Spanje (ES)", "Duitsland (DE)", "Verenigd Koninkrijk / US (EN)"])
+        platform = st.selectbox("Type Webwinkel / Platform:", ["Shopify", "WooCommerce", "Lightspeed", "Alle Webwinkels (Algemeen)"])
+        land_keuze = st.selectbox("Doelland / Markt:", ["Nederland (NL)", "Spanje (ES)", "Duitsland (DE)", "Verenigd Koninkrijk / US (EN)"])
     with c2:
-        niche = st.text_input("Niche / Zoekterm:", value="clothing boutique")
-    with c3:
-        aantal = st.slider("Aantal resultaten ophalen:", 5, 20, 10)
+        niche = st.text_input("Branche / Zoekterm:", value="Keukengerei")
+        aantal = st.slider("Aantal winkels ophalen:", 5, 25, 10)
 
-    if st.button("🔎 Start Zoekopdracht & Data Ophalen", type="primary"):
+    if st.button("🔎 Start Lead Generatie", type="primary"):
         if not st.session_state.serpapi_key:
-            st.error("Vul eerst een SerpApi-sleutel in bij het tabblad Instellingen.")
+            st.error("Stel eerst een geldige zoek-sleutel in bij het tabblad Instellingen.")
         else:
             taal_code = land_keuze.split("(")[1].replace(")", "")
-            with st.spinner(f"Bezig met zoeken naar echte Shopify-winkels in {land_keuze}..."):
-                stores, err = fetch_shopify_stores(st.session_state.serpapi_key, niche, taal_code, max_results=aantal)
+            with st.spinner(f"Bezig met zoeken naar {platform} winkels in {land_keuze}..."):
+                stores, err = fetch_stores(st.session_state.serpapi_key, platform, niche, taal_code, max_results=aantal)
                 
                 if err:
                     st.error(f"Fout bij ophalen van resultaten: {err}")
                 elif not stores:
-                    st.warning("Geen winkels gevonden voor deze zoekterm. Probeer een andere term zoals 'jewelry' of 'mode'.")
+                    st.warning("Geen winkels gevonden voor deze zoekopdracht. Probeer een bredere branche of ander platform.")
                 else:
                     nieuwe_rijen = []
                     start_id = len(st.session_state.leads) + 1
@@ -211,38 +252,40 @@ elif menu == "🔍 Nieuwe Winkels Zoeken":
                         nieuwe_rijen.append({
                             "ID": start_id + k,
                             "Winkelnaam": item["Winkelnaam"],
+                            "Platform": platform,
                             "Website": item["Website"],
                             "Taal": taal_code,
                             "Email": item["Email"],
                             "Status": "Klaar voor verzending",
-                            "Laatste_Actie": "Net opgehaald",
+                            "Laatste_Actie": "Net toegevoegd",
                             "Notities": f"Niche: {niche}"
                         })
                     st.session_state.leads = pd.concat([st.session_state.leads, pd.DataFrame(nieuwe_rijen)], ignore_index=True)
-                    st.success(f"Gereed! {len(stores)} echte winkels gevonden en toegevoegd aan je database!")
+                    st.success(f"Voltooid! {len(stores)} winkels gevonden en toegevoegd aan je database!")
 
 # TAB 3: SJABLONEN
 elif menu == "✉️ Berichten & Sjablonen":
     st.title("✉️ Meertalige Outreach Sjablonen")
+    st.write("Bekijk of bewerk de automatische introductieberichten per taalregio.")
     gekozen_taal = st.radio("Selecteer Taal:", ["NL", "EN", "DE", "ES"], horizontal=True)
     sjabloon = TEMPLATES[gekozen_taal]
     st.text_input("Onderwerpregel:", value=sjabloon["onderwerp"])
-    st.text_area("Berichtinhoud:", value=sjabloon["bericht"], height=200)
+    st.text_area("Berichtinhoud:", value=sjabloon["bericht"], height=230)
 
 # TAB 4: INSTELLINGEN
-elif menu == "⚙️ Instellingen & API":
-    st.title("⚙️ Instellingen & Verkoopconfiguratie")
-    st.subheader("SerpApi Zoekmachine Koppeling")
-    st.session_state.serpapi_key = st.text_input("SerpApi Sleutel:", value=st.session_state.serpapi_key, type="password")
-    st.success("API sleutel is actief ingesteld.")
+elif menu == "⚙️ Instellingen & Verkoop":
+    st.title("⚙️ Configuratie & Licentiebeheer")
+    st.write("Beheer systeemverbindingen en instellingen voor verkoop.")
+    
+    st.subheader("Zoekmachine Koppeling")
+    st.session_state.serpapi_key = st.text_input("Zoek API Sleutel:", value=st.session_state.serpapi_key, type="password")
     
     st.markdown("---")
     st.subheader("E-mail & SMTP Instellingen")
     col_a, col_b = st.columns(2)
     with col_a:
-        st.text_input("Afzendernaam:", value="Video App Support")
-        st.text_input("Afzender E-mailadres:", value="outreach@jouwdomein.com")
+        st.text_input("Afzendernaam:", value="Marketing Support")
+        st.text_input("Afzender E-mailadres:", value="contact@jouwbedrijf.com")
     with col_b:
         st.text_input("SMTP Server:", value="smtp.sendgrid.net")
-        st.text_input("SMTP Wachtwoord / API Key:", type="password")
-
+        st.text_input("SMTP Wachtwoord / Sleutel:", type="password")
