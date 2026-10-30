@@ -3,6 +3,9 @@ import pandas as pd
 import time
 import requests
 import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime
 
 st.set_page_config(
@@ -49,6 +52,18 @@ DEFAULT_SERPAPI_KEY = "8b186512abbc4c8935b3f8e743d2e632c29eabfa7985ff88940a6327a
 if "serpapi_key" not in st.session_state:
     st.session_state.serpapi_key = DEFAULT_SERPAPI_KEY
 
+# SMTP sessiestatus
+if "smtp_server" not in st.session_state:
+    st.session_state.smtp_server = "smtp.gmail.com"
+if "smtp_port" not in st.session_state:
+    st.session_state.smtp_port = 587
+if "smtp_user" not in st.session_state:
+    st.session_state.smtp_user = ""
+if "smtp_password" not in st.session_state:
+    st.session_state.smtp_password = ""
+if "sender_name" not in st.session_state:
+    st.session_state.sender_name = "Video App Support"
+
 if "leads" not in st.session_state:
     st.session_state.leads = pd.DataFrame(columns=[
         "ID", "Winkelnaam", "Platform", "Website", "Taal", "Email", "Status", "Laatste_Actie", "Notities"
@@ -64,7 +79,7 @@ TEMPLATES = {
             "Onze software maakt automatisch van elk nieuw product direct een professionele video en publiceert die direct op TikTok, Reels en Shorts.\n\n"
             "Je mag het 7 dagen gratis uitproberen inclusief 3 gratis video's (geen creditcard nodig):\n"
             "{link}\n\n"
-            "Met vriendelijke groet,\nHet Team"
+            "Met vriendelijke groet,\n{afzender}"
         )
     },
     "EN": {
@@ -76,7 +91,7 @@ TEMPLATES = {
             "Our automated video tool turns your new products into high-converting videos and posts them to TikTok, Instagram Reels, and YouTube Shorts for you.\n\n"
             "You can try it 100% free for 7 days (includes 3 free product videos, no credit card required):\n"
             "{link}\n\n"
-            "Best regards,\nThe Team"
+            "Best regards,\n{afzender}"
         )
     },
     "DE": {
@@ -88,7 +103,7 @@ TEMPLATES = {
             "Unsere Software erstellt aus jedem neuen Produkt vollautomatisch ansprechende Videos und veröffentlicht sie direkt auf TikTok, Instagram und YouTube.\n\n"
             "Sie können die Lösung 7 Tage lang unverbindlich testen (inkl. 3 kostenlosen Produktvideos, keine Kreditkarte erforderlich):\n"
             "{link}\n\n"
-            "Beste Grüße,\nIhr Team"
+            "Beste Grüße,\n{afzender}"
         )
     },
     "ES": {
@@ -100,7 +115,7 @@ TEMPLATES = {
             "Nuestra herramienta crea automáticamente un vídeo profesional de cada nuevo producto y lo publica en TikTok, Reels y YouTube Shorts por ti.\n\n"
             "Puedes probarla gratis durante 7 días (incluye 3 vídeos gratis, sin tarjeta de crédito):\n"
             "{link}\n\n"
-            "¡Un saludo!\nEl Equipo"
+            "¡Un saludo!\n{afzender}"
         )
     }
 }
@@ -172,6 +187,23 @@ def fetch_stores(api_key, platform_type, query_niche, country_code, max_results=
     except Exception as e:
         return [], str(e)
 
+def send_real_email(smtp_server, smtp_port, sender_email, sender_password, sender_name, recipient_email, subject, body_text):
+    msg = MIMEMultipart()
+    msg['From'] = f"{sender_name} <{sender_email}>"
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+    
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True, "Verzonden"
+    except Exception as ex:
+        return False, str(ex)
+
 # Sidebar
 st.sidebar.title("🚀 Outreach Engine")
 menu = st.sidebar.radio("Navigatie", ["📊 Dashboard & Leads", "🔍 Leads Genereren", "✉️ Berichten & Sjablonen", "⚙️ Instellingen & Verkoop"])
@@ -188,18 +220,20 @@ if menu == "📊 Dashboard & Leads":
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        app_link = st.text_input("Jouw Aanbod / Website Link:", value="https://jouwbedrijf.com/demo")
+        app_link = st.text_input("Jouw Aanbod / Website Link:", value="https://apps.shopify.com/jouw-app-link")
     with col2:
-        verzend_limiet = st.number_input("Aantal te verzenden:", min_value=1, max_value=50, value=10)
+        verzend_limiet = st.number_input("Aantal te verzenden:", min_value=1, max_value=50, value=5)
     with col3:
         st.write("")
         st.write("")
-        start_knop = st.button("🚀 Start Dagelijkse Verzending", type="primary")
+        start_knop = st.button("🚀 Start Verzending", type="primary")
 
     if start_knop:
         klaar_leads = st.session_state.leads[st.session_state.leads["Status"] == "Klaar voor verzending"]
         if klaar_leads.empty:
             st.warning("Er zijn momenteel geen contacten met de status 'Klaar voor verzending'.")
+        elif not st.session_state.smtp_user or not st.session_state.smtp_password:
+            st.error("Configureer eerst je afzender e-mailadres en wachtwoord bij het tabblad Instellingen & Verkoop!")
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -207,14 +241,40 @@ if menu == "📊 Dashboard & Leads":
             totaal = len(leads_om_te_sturen)
             
             for i, (idx, row) in enumerate(leads_om_te_sturen.iterrows()):
-                status_text.text(f"Verzenden naar: {row['Winkelnaam']} ({row['Email']})...")
-                time.sleep(0.8)
-                st.session_state.leads.at[idx, "Status"] = "Verzonden"
-                st.session_state.leads.at[idx, "Laatste_Actie"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                status_text.text(f"Versturen naar {row['Winkelnaam']} ({row['Email']})...")
+                
+                lang = row.get("Taal", "NL")
+                tpl = TEMPLATES.get(lang, TEMPLATES["NL"])
+                subject = tpl["onderwerp"]
+                body = tpl["bericht"].format(
+                    naam=row["Winkelnaam"],
+                    link=app_link,
+                    afzender=st.session_state.sender_name
+                )
+                
+                success, msg = send_real_email(
+                    st.session_state.smtp_server,
+                    st.session_state.smtp_port,
+                    st.session_state.smtp_user,
+                    st.session_state.smtp_password,
+                    st.session_state.sender_name,
+                    row["Email"],
+                    subject,
+                    body
+                )
+                
+                if success:
+                    st.session_state.leads.at[idx, "Status"] = "Verzonden"
+                    st.session_state.leads.at[idx, "Laatste_Actie"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                else:
+                    st.session_state.leads.at[idx, "Status"] = "Mislukt"
+                    st.session_state.leads.at[idx, "Notities"] = f"Fout: {msg[:60]}"
+                
+                time.sleep(1.0)
                 progress_bar.progress((i + 1) / totaal)
             
-            status_text.success(f"🎉 Succesvol {totaal} berichten verwerkt!")
-            time.sleep(1)
+            status_text.success(f"Campagne voltooid! {totaal} adressen verwerkt.")
+            time.sleep(1.5)
             st.rerun()
 
     st.subheader("Overzicht Database")
@@ -284,8 +344,10 @@ elif menu == "⚙️ Instellingen & Verkoop":
     st.subheader("E-mail & SMTP Instellingen")
     col_a, col_b = st.columns(2)
     with col_a:
-        st.text_input("Afzendernaam:", value="Marketing Support")
-        st.text_input("Afzender E-mailadres:", value="contact@jouwbedrijf.com")
+        st.session_state.sender_name = st.text_input("Afzendernaam:", value=st.session_state.sender_name)
+        st.session_state.smtp_user = st.text_input("Afzender E-mailadres:", value=st.session_state.smtp_user, placeholder="bijv. info@jouwdomein.nl of naam@gmail.com")
+        st.session_state.smtp_password = st.text_input("E-mail Wachtwoord / App Wachtwoord:", value=st.session_state.smtp_password, type="password")
     with col_b:
-        st.text_input("SMTP Server:", value="smtp.sendgrid.net")
-        st.text_input("SMTP Wachtwoord / Sleutel:", type="password")
+        st.session_state.smtp_server = st.text_input("SMTP Server:", value=st.session_state.smtp_server)
+        st.session_state.smtp_port = st.number_input("SMTP Poort (587 voor TLS, 465 voor SSL):", value=st.session_state.smtp_port)
+
