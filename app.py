@@ -311,7 +311,7 @@ elif menu == "⚙️ Instellingen & Verkoop":
     
     st.markdown("---")
     st.subheader("E-mail & SMTP Instellingen")
-        col_a, col_b = st.columns(2)
+    col_a, col_b = st.columns(2)
     with col_a:
         st.session_state.sender_name = st.text_input("Afzendernaam:", value=st.session_state.sender_name)
         st.session_state.smtp_user = st.text_input("Afzender E-mailadres:", value=st.session_state.smtp_user)
