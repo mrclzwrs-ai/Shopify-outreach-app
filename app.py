@@ -331,18 +331,19 @@ elif menu == "⚙️ Instellingen & Verkoop":
 
     st.markdown("---")
     st.subheader("Verbinding testen")
-    st.write("Stuurt één testmail naar je eigen afzenderadres, zodat je ziet of alles werkt.")
-    if st.button("✉️ Stuur testmail naar mezelf"):
+    st.write("Stuur eerst één testmail, zodat je zeker weet dat alles werkt voordat je klanten gaat mailen.")
+    test_adres = st.text_input("Testmail sturen naar:", value=st.session_state.smtp_user)
+    if st.button("✉️ Stuur testmail"):
         if not st.session_state.smtp_password:
             st.error("Er is nog geen app-wachtwoord ingevuld (in de kluis of hierboven).")
         else:
             ok, melding = send_real_email(
                 st.session_state.smtp_server, st.session_state.smtp_port,
                 st.session_state.smtp_user, st.session_state.smtp_password,
-                st.session_state.sender_name, st.session_state.smtp_user.strip(),
+                st.session_state.sender_name, test_adres.strip(),
                 "Testmail Outreach Engine", "Het werkt! Je Outreach Engine kan mails versturen."
             )
             if ok:
-                st.success("Gelukt! Kijk in je inbox van " + st.session_state.smtp_user)
+                st.success("Gelukt! Kijk in de inbox van " + test_adres.strip() + " (en voor de zekerheid ook in Spam).")
             else:
                 st.error("Niet gelukt. Melding van de mailserver: " + melding)
