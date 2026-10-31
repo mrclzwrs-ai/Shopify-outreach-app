@@ -47,19 +47,28 @@ st.markdown("""
 
 DEFAULT_SERPAPI_KEY = "8b186512abbc4c8935b3f8e743d2e632c29eabfa7985ff88940a6327ae860b0b"
 
+def kluis(naam, standaard):
+    """Haalt een instelling uit de Streamlit-kluis (Secrets). Staat hij daar niet, dan de standaardwaarde."""
+    try:
+        if naam in st.secrets:
+            return st.secrets[naam]
+    except Exception:
+        pass
+    return standaard
+
 if "serpapi_key" not in st.session_state:
-    st.session_state.serpapi_key = DEFAULT_SERPAPI_KEY
+    st.session_state.serpapi_key = kluis("serpapi_key", DEFAULT_SERPAPI_KEY)
 
 if "smtp_server" not in st.session_state:
-    st.session_state.smtp_server = "smtp.gmail.com"
+    st.session_state.smtp_server = kluis("smtp_server", "smtp.gmail.com")
 if "smtp_port" not in st.session_state:
-    st.session_state.smtp_port = 465
+    st.session_state.smtp_port = int(kluis("smtp_port", 465))
 if "smtp_user" not in st.session_state:
-    st.session_state.smtp_user = "Info@shopreelsapp.com"
+    st.session_state.smtp_user = kluis("smtp_user", "Info@shopreelsapp.com")
 if "smtp_password" not in st.session_state:
-    st.session_state.smtp_password = ""
+    st.session_state.smtp_password = kluis("smtp_password", "")
 if "sender_name" not in st.session_state:
-    st.session_state.sender_name = "Video App Support"
+    st.session_state.sender_name = kluis("sender_name", "Video App Support")
 
 if "leads" not in st.session_state:
     st.session_state.leads = pd.DataFrame(columns=[
@@ -319,3 +328,21 @@ elif menu == "⚙️ Instellingen & Verkoop":
     with col_b:
         st.session_state.smtp_server = st.text_input("SMTP Server:", value=st.session_state.smtp_server)
         st.session_state.smtp_port = st.number_input("SMTP Poort (standaard 465 voor SSL):", value=st.session_state.smtp_port)
+
+    st.markdown("---")
+    st.subheader("Verbinding testen")
+    st.write("Stuurt één testmail naar je eigen afzenderadres, zodat je ziet of alles werkt.")
+    if st.button("✉️ Stuur testmail naar mezelf"):
+        if not st.session_state.smtp_password:
+            st.error("Er is nog geen app-wachtwoord ingevuld (in de kluis of hierboven).")
+        else:
+            ok, melding = send_real_email(
+                st.session_state.smtp_server, st.session_state.smtp_port,
+                st.session_state.smtp_user, st.session_state.smtp_password,
+                st.session_state.sender_name, st.session_state.smtp_user.strip(),
+                "Testmail Outreach Engine", "Het werkt! Je Outreach Engine kan mails versturen."
+            )
+            if ok:
+                st.success("Gelukt! Kijk in je inbox van " + st.session_state.smtp_user)
+            else:
+                st.error("Niet gelukt. Melding van de mailserver: " + melding)
