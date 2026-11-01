@@ -45,7 +45,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-DEFAULT_SERPAPI_KEY = "8b186512abbc4c8935b3f8e743d2e632c29eabfa7985ff88940a6327ae860b0b"
+DEFAULT_SERPAPI_KEY = ""
 
 def kluis(naam, standaard):
     """Haalt een instelling uit de Streamlit-kluis (Secrets). Staat hij daar niet, dan de standaardwaarde."""
