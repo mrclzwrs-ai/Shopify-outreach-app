@@ -90,7 +90,7 @@ if menu == "🔍 Winkels zoeken":
                               value=suggesties[0] if suggesties else "jewelry")
         if suggesties:
             st.caption("Ideeën: " + ", ".join(suggesties))
-    aantal = st.slider("Hoeveel winkels wil je vinden?", 3, 20, 10)
+    aantal = int(st.number_input("Hoeveel winkels wil je vinden? (1 tot 20)", min_value=1, max_value=20, value=5, step=1))
     st.caption("Elke zoekronde kost 1 van je SerpApi-zoekopdrachten. De app doet er maximaal 3.")
 
     if st.button("🔎 Zoeken", type="primary"):
