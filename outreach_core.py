@@ -52,7 +52,7 @@ OVERSLAAN_DOMEINEN = {
     "shopify.com", "apps.shopify.com", "amazon.com", "amazon.nl",
     "amazon.de", "amazon.co.uk", "etsy.com", "ebay.com", "bol.com", "zalando.nl",
     "facebook.com", "instagram.com", "pinterest.com", "youtube.com", "tiktok.com",
-    "reddit.com", "linkedin.com", "wikipedia.org", "trustpilot.com", "marktplaats.nl",
+    "reddit.com", "google.com", "linkedin.com", "wikipedia.org", "trustpilot.com", "marktplaats.nl",
 }
 
 # Adressen die je vaak in websitecode vindt maar die niet van de winkel zijn.
@@ -187,6 +187,33 @@ def domein_van(url):
     host = urlparse(url if "://" in url else "https://" + url).netloc.lower()
     host = host.split(":")[0]
     return host[4:] if host.startswith("www.") else host
+
+
+def echte_link(item):
+    """
+    Google geeft soms een doorverwijslink (google.com/url?q=...) in plaats van het
+    echte adres. Dit haalt het echte adres van de winkel eruit.
+    """
+    from urllib.parse import parse_qs
+    kandidaten = [item.get("link", ""), item.get("redirect_link", ""), item.get("displayed_link", "")]
+    for k in kandidaten:
+        if not k:
+            continue
+        k = k.split(" › ")[0].split(" ")[0].strip()
+        if "://" not in k:
+            k = "https://" + k
+        dom = domein_van(k)
+        if not dom:
+            continue
+        if dom.startswith("google.") or ".google." in dom:
+            qs = parse_qs(urlparse(k).query)
+            for sleutel in ("q", "url", "u", "adurl"):
+                for w in qs.get(sleutel, []):
+                    if w.startswith("http") and not domein_van(w).startswith("google."):
+                        return w
+            continue
+        return k
+    return ""
 
 
 def basis_url(url):
@@ -409,8 +436,8 @@ def zoek_websites(api_key, niche, markt="US", pagina=0, log=None):
 
     urls, gezien = [], set()
     for item in data.get("organic_results", []):
-        link = item.get("link", "")
-        dom = domein_van(link)
+        link = echte_link(item)
+        dom = domein_van(link) if link else ""
         if not dom or dom in gezien or is_overslaan_domein(dom):
             continue
         gezien.add(dom)
@@ -418,6 +445,9 @@ def zoek_websites(api_key, niche, markt="US", pagina=0, log=None):
     if log:
         log(f"Google: '{vraag}' -> {len(data.get('organic_results', []))} resultaten, "
             f"{len(urls)} bruikbare websites")
+        if not urls and data.get("organic_results"):
+            eerste = data["organic_results"][0]
+            log(f"  (voorbeeld: link={eerste.get('link')} | getoond={eerste.get('displayed_link')})")
     return urls, None
 
 
