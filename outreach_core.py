@@ -108,7 +108,7 @@ TEMPLATES = {
             "Groet,\n"
             "{afzender}\n\n"
             "--\n"
-            "Liever geen mail meer van mij? Antwoord dan met 'afmelden', dan hoor je niets meer van me."
+            "{afmelden}"
         ),
     },
     "EN": {
@@ -127,7 +127,7 @@ TEMPLATES = {
             "Best,\n"
             "{afzender}\n\n"
             "--\n"
-            "Don't want to hear from me again? Reply with 'unsubscribe' and I won't email you again."
+            "{afmelden}"
         ),
     },
     "DE": {
@@ -146,7 +146,7 @@ TEMPLATES = {
             "Viele Grüße\n"
             "{afzender}\n\n"
             "--\n"
-            "Keine E-Mails mehr von mir? Antworten Sie mit 'abmelden', dann schreibe ich Ihnen nicht mehr."
+            "{afmelden}"
         ),
     },
     "ES": {
@@ -165,17 +165,67 @@ TEMPLATES = {
             "Un saludo,\n"
             "{afzender}\n\n"
             "--\n"
-            "¿Prefieres no recibir más correos? Responde con 'baja' y no te escribiré más."
+            "{afmelden}"
         ),
     },
 }
 
 
+AFMELD_ZIN = {
+    "NL": "Is deze mail niet voor jou bedoeld? Tik hier, dan krijg je nooit meer een mail van mij.",
+    "EN": "Not relevant for you? Tap here and you'll never hear from me again.",
+    "DE": "Nicht relevant für Sie? Tippen Sie hier, dann bekommen Sie keine E-Mails mehr von mir.",
+    "ES": "¿No te interesa? Toca aquí y no volverás a recibir correos míos.",
+}
+AFMELD_ADRES = "info@shopreelsapp.com"
+
+
+def afmeld_link(adres=AFMELD_ADRES):
+    return f"mailto:{adres}?subject=Afmelden%20%2F%20Unsubscribe&body=Please%20remove%20me%20from%20your%20list."
+
+
+def maak_html(tekst):
+    """Maakt van de platte mailtekst een nette HTML-versie met klikbare links.
+    Een regel gevolgd door een regel die met 'mailto:' begint wordt één klikbare link."""
+    regels = tekst.split("\n")
+    uit, i = [], 0
+    while i < len(regels):
+        r = regels[i]
+        if i + 1 < len(regels) and regels[i + 1].startswith("mailto:"):
+            uit.append(f'<a href="{html.escape(regels[i + 1])}" style="color:#888">{html.escape(r)}</a>')
+            i += 2
+            continue
+        e = html.escape(r)
+        e = re.sub(r"(https?://[^\s<]+)", r'<a href="\1">\1</a>', e)
+        uit.append(e)
+        i += 1
+    lichaam = "<br>\n".join(uit).replace("<br>\n--<br>\n", '<br>\n<hr style="border:none;border-top:1px solid #ddd">\n')
+    return f'<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#222">{lichaam}</div>'
+
+
+JE_WINKEL = {"NL": "jullie webshop", "EN": "your store", "DE": "Ihren Shop", "ES": "vuestra tienda"}
+
+
+def is_rare_naam(naam):
+    """Namen als '518Ac7 2' of 'Zz1r4h 50' zijn automatische Shopify-codes, geen echte winkelnaam."""
+    n = (naam or "").replace(" ", "").replace("-", "")
+    if not n:
+        return True
+    cijfers = sum(c.isdigit() for c in n)
+    return cijfers >= 2 and cijfers / len(n) > 0.2
+
+
 def maak_mail(taal, winkelnaam, afzender, link=SHOPREELS_LINK):
     """Geeft (onderwerp, tekst) terug voor een winkel."""
-    tpl = TEMPLATES.get(taal, TEMPLATES["EN"])
+    tpl = dict(TEMPLATES.get(taal, TEMPLATES["EN"]))
+    if is_rare_naam(winkelnaam):
+        # Geen echte naam bekend: dan gewoon "jullie webshop" / "your store".
+        for oud in ("jullie webshop {naam}", "your store {naam}", "Ihren Shop {naam}", "vuestra tienda {naam}"):
+            tpl["bericht"] = tpl["bericht"].replace(oud, "{naam}")
+        winkelnaam = JE_WINKEL.get(taal, "your store")
     onderwerp = tpl["onderwerp"].format(naam=winkelnaam)
-    tekst = tpl["bericht"].format(naam=winkelnaam, link=link, afzender=afzender)
+    afmelden = AFMELD_ZIN.get(taal, AFMELD_ZIN["EN"]) + "\n" + afmeld_link()
+    tekst = tpl["bericht"].format(naam=winkelnaam, link=link, afzender=afzender, afmelden=afmelden)
     return onderwerp, tekst
 
 
@@ -690,7 +740,7 @@ def al_bekend(adres, domein, bekende_adressen, bekende_domeinen):
 def verstuur_mail(smtp_user, wachtwoord, afzendernaam, aan, onderwerp, tekst,
                   smtp_server="smtp.gmail.com", smtp_port=465, afmeldbaar=True):
     afzender = smtp_user.strip()
-    msg = MIMEMultipart()
+    msg = MIMEMultipart("alternative")
     msg["From"] = f"{afzendernaam} <{afzender}>"
     msg["To"] = aan
     msg["Subject"] = onderwerp
@@ -700,6 +750,7 @@ def verstuur_mail(smtp_user, wachtwoord, afzendernaam, aan, onderwerp, tekst,
     if afmeldbaar:
         msg["List-Unsubscribe"] = f"<mailto:{afzender}?subject=unsubscribe>"
     msg.attach(MIMEText(tekst, "plain", "utf-8"))
+    msg.attach(MIMEText(maak_html(tekst), "html", "utf-8"))
     try:
         port = int(smtp_port)
         if port == 465:
