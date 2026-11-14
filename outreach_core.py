@@ -171,9 +171,26 @@ TEMPLATES = {
 }
 
 
+JE_WINKEL = {"NL": "jullie webshop", "EN": "your store", "DE": "Ihren Shop", "ES": "vuestra tienda"}
+
+
+def is_rare_naam(naam):
+    """Namen als '518Ac7 2' of 'Zz1r4h 50' zijn automatische Shopify-codes, geen echte winkelnaam."""
+    n = (naam or "").replace(" ", "").replace("-", "")
+    if not n:
+        return True
+    cijfers = sum(c.isdigit() for c in n)
+    return cijfers >= 2 and cijfers / len(n) > 0.2
+
+
 def maak_mail(taal, winkelnaam, afzender, link=SHOPREELS_LINK):
     """Geeft (onderwerp, tekst) terug voor een winkel."""
-    tpl = TEMPLATES.get(taal, TEMPLATES["EN"])
+    tpl = dict(TEMPLATES.get(taal, TEMPLATES["EN"]))
+    if is_rare_naam(winkelnaam):
+        # Geen echte naam bekend: dan gewoon "jullie webshop" / "your store".
+        for oud in ("jullie webshop {naam}", "your store {naam}", "Ihren Shop {naam}", "vuestra tienda {naam}"):
+            tpl["bericht"] = tpl["bericht"].replace(oud, "{naam}")
+        winkelnaam = JE_WINKEL.get(taal, "your store")
     onderwerp = tpl["onderwerp"].format(naam=winkelnaam)
     tekst = tpl["bericht"].format(naam=winkelnaam, link=link, afzender=afzender)
     return onderwerp, tekst
