@@ -784,11 +784,22 @@ def shopify_adressen(aantal=300, log=print, rnd=None):
     Geeft (lijst met https://iets.myshopify.com, foutmelding of None).
     """
     rnd = rnd or random.Random()
+    # Eerst het bestand dat elke week via GitHub wordt bijgewerkt.
+    import os
+    pad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shopify_winkels.txt")
+    if os.path.exists(pad):
+        with open(pad, encoding="utf-8") as f:
+            alle = [r.strip() for r in f if r.strip()]
+        if alle:
+            keuze = rnd.sample(alle, min(aantal, len(alle)))
+            log(f"Shopify-lijst: {len(keuze)} winkels gekozen uit {len(alle)} in de lijst")
+            return ["https://" + h for h in keuze], None
     sessie = _sessie()
     try:
         indexen = _cc_indexen(sessie)
     except Exception as ex:
-        return [], f"Shopify-lijst niet bereikbaar: {ex}"
+        return [], ("De Shopify-lijst is nog niet gevuld en Common Crawl is vanaf hier niet bereikbaar. "
+                    "Hij wordt via GitHub bijgewerkt (elke zondag, of met de hand via Actions).")
 
     hosts = []
     for poging in range(4):
