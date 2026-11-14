@@ -148,7 +148,7 @@ Antwoord ALLEEN met geldige JSON in deze vorm:
  "mail": "de volledige mailtekst"}"""
 
 
-def _vraag_ai(api_key, prompt, max_tokens=1200):
+def _vraag_ai(api_key, prompt, max_tokens=4000):
     r = requests.post(
         API_URL,
         headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
@@ -160,14 +160,18 @@ def _vraag_ai(api_key, prompt, max_tokens=1200):
     if r.status_code != 200:
         raise RuntimeError(f"AI gaf code {r.status_code}: {r.text[:200]}")
     data = r.json()
-    return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    tekst = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    if data.get("stop_reason") == "max_tokens":
+        raise RuntimeError("antwoord te lang, afgebroken")
+    return tekst
 
 
 def _lees_json(tekst):
+    tekst = re.sub(r"^```(?:json)?\s*|\s*```$", "", tekst.strip())
     m = re.search(r"\{.*\}", tekst, re.S)
     if not m:
-        raise ValueError("Geen JSON in het antwoord")
-    data = json.loads(m.group(0))
+        raise ValueError("Geen JSON in het antwoord: " + tekst[:60].replace("\n", " "))
+    data = json.loads(m.group(0), strict=False)  # strict=False: losse regeleindes in tekst toestaan
     for veld in ("rapport", "onderwerp", "mail"):
         if not isinstance(data.get(veld), str) or not data[veld].strip():
             raise ValueError(f"Veld '{veld}' ontbreekt")
@@ -199,11 +203,16 @@ def schrijf_persoonlijke_mail(lead, afzender, link=oc.SHOPREELS_LINK, api_key=No
         f"Afzender (naam onder de mail): {afzender}\nLink naar ShopReels: {link}\n\n"
         f"Openbare tekst van hun eigen website:\n\"\"\"\n{tekst}\n\"\"\""
     )
-    try:
-        antwoord = ai(prompt) if ai else _vraag_ai(api_key, prompt)
-        data = _lees_json(antwoord)
-    except Exception as ex:  # noqa: BLE001 – elke fout = terugvallen op de standaardmail
-        lead["detective"] = f"AI-fout ({str(ex)[:80]}): standaardmail gebruikt"
+    data, fout = None, ""
+    for poging in range(2):  # bij een mislukt antwoord één keer opnieuw proberen
+        try:
+            antwoord = ai(prompt) if ai else _vraag_ai(api_key, prompt)
+            data = _lees_json(antwoord)
+            break
+        except Exception as ex:  # noqa: BLE001 – elke fout = terugvallen op de standaardmail
+            fout = str(ex)[:120]
+    if data is None:
+        lead["detective"] = f"AI-fout ({fout}): standaardmail gebruikt"
         return None
 
     mail = data["mail"].strip()
