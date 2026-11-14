@@ -738,7 +738,7 @@ def al_bekend(adres, domein, bekende_adressen, bekende_domeinen):
 # ---------------------------------------------------------------------------
 
 def verstuur_mail(smtp_user, wachtwoord, afzendernaam, aan, onderwerp, tekst,
-                  smtp_server="smtp.gmail.com", smtp_port=465, afmeldbaar=True):
+                  smtp_server="smtp.gmail.com", smtp_port=465, afmeldbaar=True, html_tekst=None):
     afzender = smtp_user.strip()
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{afzendernaam} <{afzender}>"
@@ -750,7 +750,7 @@ def verstuur_mail(smtp_user, wachtwoord, afzendernaam, aan, onderwerp, tekst,
     if afmeldbaar:
         msg["List-Unsubscribe"] = f"<mailto:{afzender}?subject=unsubscribe>"
     msg.attach(MIMEText(tekst, "plain", "utf-8"))
-    msg.attach(MIMEText(maak_html(tekst), "html", "utf-8"))
+    msg.attach(MIMEText(html_tekst or maak_html(tekst), "html", "utf-8"))
     try:
         port = int(smtp_port)
         if port == 465:
