@@ -231,14 +231,24 @@ def _sessie():
     return s
 
 
-def _haal(sessie, url, timeout=10):
+LAATSTE_FOUT = {"tekst": ""}
+
+
+def _haal(sessie, url, timeout=12):
     try:
         r = sessie.get(url, timeout=timeout, allow_redirects=True)
         if r.status_code == 200:
             return r
-    except requests.RequestException:
-        pass
+        LAATSTE_FOUT["tekst"] = f"code {r.status_code}"
+    except requests.Timeout:
+        LAATSTE_FOUT["tekst"] = "duurde te lang"
+    except requests.RequestException as ex:
+        LAATSTE_FOUT["tekst"] = type(ex).__name__
     return None
+
+
+SHOPIFY_KENMERKEN = ("cdn.shopify.com", "/cdn/shop/", "Shopify.theme", "Shopify.shop",
+                     "window.Shopify", "shopify-section", "shopify-features")
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +356,10 @@ def bekijk_winkel(url, sessie=None):
 
     home = _haal(sessie, basis + "/")
     if home is None:
-        info["reden"] = "Site niet bereikbaar"
+        info["reden"] = f"Site niet bereikbaar ({LAATSTE_FOUT['tekst']})"
+        return info
+    if "/password" in home.url:
+        info["reden"] = "Winkel nog dicht (wachtwoord)"
         return info
     # Volg een eventuele doorverwijzing naar het echte domein.
     echt = domein_van(home.url)
@@ -360,8 +373,10 @@ def bekijk_winkel(url, sessie=None):
 
     tekst = home.text
     info["winkelnaam"] = winkelnaam_uit_html(tekst, domein)
-    info["shopify"] = ("cdn.shopify.com" in tekst) or ("Shopify.shop" in tekst) or \
-        ("x-shopid" in {k.lower() for k in home.headers.keys()})
+    koppen = {k.lower() for k in home.headers.keys()}
+    info["shopify"] = any(k in tekst for k in SHOPIFY_KENMERKEN) or \
+        bool(koppen & {"x-shopid", "x-shopify-stage", "x-sorting-hat-shopid", "x-storefront-renderer-rendered"}) or \
+        "shopify" in home.headers.get("powered-by", "").lower()
 
     # Aantal producten (openbare Shopify-lijst). Een lege winkel is geen klant.
     pj = _haal(sessie, basis + "/products.json?limit=30")
@@ -410,8 +425,8 @@ def zoek_websites(api_key, niche, markt="US", pagina=0, log=None):
     # gecontroleerd, dus een zoekresultaat dat geen Shopify is valt vanzelf af.
     varianten = [
         'site:myshopify.com {niche}',
-        '{niche} "powered by shopify"',
-        '{niche} shop inurl:collections',
+        '{niche} inurl:"/collections/all"',
+        '{niche} store "powered by shopify" -blog -how -apps',
     ]
     vraag = varianten[pagina % len(varianten)].format(niche=niche)
     params = {
