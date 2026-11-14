@@ -1,0 +1,14 @@
+{
+  "_uitleg": "Instellingen voor de dagelijkse automatische run. stand = 'proef' (alleen een overzicht naar jezelf) of 'echt' (mails gaan echt naar winkels).",
+  "stand": "proef",
+  "mails_per_dag": 15,
+  "zoekopdrachten_per_dag": 6,
+  "link": "https://shopreelsapp.com",
+  "markten": ["US", "UK", "NL", "BE"],
+  "branches": {
+    "EN": ["jewelry", "handmade jewelry", "women's clothing", "home decor", "candles", "boutique clothing", "ceramics", "baby clothing", "skincare", "pet accessories"],
+    "NL": ["sieraden", "dameskleding", "woonaccessoires", "kaarsen", "kinderkleding", "boetiek", "huidverzorging", "cadeauwinkel", "keramiek", "hondenaccessoires"],
+    "DE": ["schmuck", "damenmode", "wohnaccessoires", "kerzen"],
+    "ES": ["joyería", "ropa de mujer", "decoración hogar", "velas"]
+  }
+}
