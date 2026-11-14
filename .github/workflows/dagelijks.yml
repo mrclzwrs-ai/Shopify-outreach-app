@@ -1,0 +1,34 @@
+name: Dagelijkse outreach
+
+on:
+  schedule:
+    - cron: "17 8 * * 1-5"   # maandag t/m vrijdag rond 09:17 (Spaanse tijd, wintertijd)
+  workflow_dispatch:
+    inputs:
+      stand:
+        description: "Leeg = stand uit instellingen.json, of 'proef' / 'echt'"
+        required: false
+        default: ""
+
+concurrency:
+  group: outreach
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Outreach draaien
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          STAND_OVERRIDE: ${{ github.event.inputs.stand }}
+        run: python dagelijks.py
