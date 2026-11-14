@@ -1,6 +1,6 @@
 {
   "_uitleg": "Instellingen voor de dagelijkse automatische run. stand = 'proef' (alleen een overzicht naar jezelf) of 'echt' (mails gaan echt naar winkels). bron = 'shopify-lijst' (gratis, alle soorten winkels) of 'google'.",
-  "stand": "proef",
+  "stand": "echt",
   "mails_per_dag": 10,
   "zoekopdrachten_per_dag": 6,
   "link": "https://shopreelsapp.com",
