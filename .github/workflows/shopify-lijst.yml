@@ -15,14 +15,14 @@ concurrency:
 jobs:
   bijwerken:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install requests
-      - run: python shopify_lijst_bijwerken.py
+      - run: python -u shopify_lijst_bijwerken.py
       - name: Opslaan
         run: |
           git config user.name "outreach-bot"

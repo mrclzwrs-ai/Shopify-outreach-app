@@ -31,4 +31,4 @@ jobs:
           SENDER_NAME: ${{ secrets.SENDER_NAME }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           STAND_OVERRIDE: ${{ github.event.inputs.stand }}
-        run: python dagelijks.py
+        run: python -u dagelijks.py
