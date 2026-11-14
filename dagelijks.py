@@ -16,6 +16,7 @@ import time
 from datetime import date
 
 import detective
+import dossier
 import outreach_core as oc
 
 
@@ -142,10 +143,16 @@ def main():
     rapport = "\n".join(regels)
     print("\n" + rapport)
 
-    ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Outreach Engine", rapport_naar,
-                                   f"Outreach-overzicht {date.today().strftime('%d-%m')}: "
-                                   f"{len(leads)} winkels ({stand})",
-                                   rapport, afmeldbaar=False)
+    try:
+        dossier_html = dossier.maak_dossier_html(stand, [l for l, _ in resultaten], mails,
+                                                 [s for _, s in resultaten], len(overgeslagen), oc.MARKTEN)
+    except Exception as ex:  # opmaak mag het overzicht nooit tegenhouden
+        print("Dossier-opmaak mislukt, gewone tekst gebruikt:", ex)
+        dossier_html = None
+    ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "De Bedrijfsdetective", rapport_naar,
+                                   f"Ochtendrapport {date.today().strftime('%d-%m')}: "
+                                   f"{len(leads)} dossiers ({stand})",
+                                   rapport, afmeldbaar=False, html_tekst=dossier_html)
     print("Overzicht gemaild:", ok, "" if ok else melding)
 
 
