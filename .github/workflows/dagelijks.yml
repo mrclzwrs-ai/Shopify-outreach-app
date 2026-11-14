@@ -30,5 +30,6 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SENDER_NAME: ${{ secrets.SENDER_NAME }}
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           STAND_OVERRIDE: ${{ github.event.inputs.stand }}
         run: python -u dagelijks.py
