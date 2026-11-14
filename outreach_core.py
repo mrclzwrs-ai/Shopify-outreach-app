@@ -343,7 +343,63 @@ def winkelnaam_uit_html(tekst, domein):
     return naam
 
 
-def bekijk_winkel(url, sessie=None):
+# Woorden die laten zien dat het geen winkel is maar een dienstverlener voor winkels.
+GEEN_WINKEL_WOORDEN = (
+    "shopify theme", "shopify themes", "premium theme", "theme store", "themeforest",
+    "shopify agency", "shopify expert", "shopify partner", "shopify developer",
+    "web design agency", "ecommerce agency", "e-commerce agency", "development agency",
+    "dropshipping course", "dropship course", "shopify apps", "app for shopify",
+    "website template", "templates", "theme demo", "webdesign", "webbureau",
+)
+GEEN_WINKEL_EXTENSIES = (".dev", ".agency", ".io", ".app", ".tech", ".digital")
+
+# Extra woorden per branche, zodat bijv. een sieradenwinkel die "necklace" zegt ook telt.
+BRANCHE_WOORDEN = {
+    "jewelry": ["jewelry", "jewellery", "necklace", "earring", "bracelet", "ring", "pendant"],
+    "jewellery": ["jewelry", "jewellery", "necklace", "earring", "bracelet", "ring"],
+    "sieraden": ["sieraden", "ketting", "oorbel", "armband", "ring", "hanger", "jewelry"],
+    "schmuck": ["schmuck", "kette", "ohrring", "armband", "ring"],
+    "joyería": ["joyería", "joya", "collar", "pendiente", "pulsera", "anillo"],
+    "clothing": ["clothing", "dress", "tops", "shirt", "jeans", "apparel"],
+    "kleding": ["kleding", "jurk", "broek", "shirt", "trui", "jas"],
+    "home decor": ["decor", "home", "vase", "pillow", "cushion", "candle", "wall art"],
+    "woonaccessoires": ["woon", "interieur", "vaas", "kussen", "kaars", "decoratie"],
+    "candles": ["candle", "wax", "wick"],
+    "kaarsen": ["kaars", "kaarsen", "geurkaars"],
+}
+
+
+def branche_woorden(niche):
+    niche = (niche or "").lower().strip()
+    woorden = set()
+    for sleutel, lijst in BRANCHE_WOORDEN.items():
+        if sleutel in niche:
+            woorden.update(lijst)
+    woorden.update(w for w in re.split(r"[\s,/']+", niche) if len(w) > 3)
+    return woorden
+
+
+def is_dienstverlener(domein, homepage_tekst):
+    if domein.endswith(GEEN_WINKEL_EXTENSIES):
+        return True
+    kop = " ".join(re.findall(r"<title[^>]*>(.*?)</title>", homepage_tekst or "", re.I | re.S))
+    kop += " " + " ".join(re.findall(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']*)',
+                                     homepage_tekst or "", re.I))
+    kop = html.unescape(kop).lower()
+    return any(w in kop for w in GEEN_WINKEL_WOORDEN)
+
+
+def past_bij_branche(niche, homepage_tekst, producten_json):
+    woorden = branche_woorden(niche)
+    if not woorden:
+        return True
+    tekst = (homepage_tekst or "").lower()
+    for p in producten_json or []:
+        tekst += " " + " ".join(str(p.get(k, "")) for k in ("title", "product_type", "tags")).lower()
+    return any(re.search(r"\b" + re.escape(w), tekst) for w in woorden)
+
+
+def bekijk_winkel(url, sessie=None, niche=None):
     """
     Bezoekt een winkel en geeft een dict terug:
     domein, website, winkelnaam, shopify (bool), producten (int of None), email, reden
@@ -379,6 +435,11 @@ def bekijk_winkel(url, sessie=None):
         "shopify" in home.headers.get("powered-by", "").lower()
 
     # Aantal producten (openbare Shopify-lijst). Een lege winkel is geen klant.
+    if is_dienstverlener(domein, tekst):
+        info["reden"] = "Geen winkel (thema-maker, bureau of dienstverlener)"
+        return info
+
+    producten = None
     pj = _haal(sessie, basis + "/products.json?limit=30")
     if pj is not None:
         try:
@@ -394,6 +455,9 @@ def bekijk_winkel(url, sessie=None):
         return info
     if info["producten"] is not None and info["producten"] < 3:
         info["reden"] = "Te weinig producten"
+        return info
+    if niche and not past_bij_branche(niche, tekst, producten if isinstance(producten, list) else []):
+        info["reden"] = "Past niet bij de branche"
         return info
 
     adressen = adressen_uit_html(tekst)
@@ -617,7 +681,7 @@ def zoek_leads(api_key, niche, markt, max_leads=10, max_zoekopdrachten=2, startp
             if dom in bekende_domeinen:
                 overgeslagen.append({"website": url, "reden": "Al eerder contact"})
                 continue
-            info = bekijk_winkel(url, sessie)
+            info = bekijk_winkel(url, sessie, niche=niche)
             if info["reden"]:
                 overgeslagen.append({"website": info["website"], "reden": info["reden"]})
                 log(f"  - {info['website']}: {info['reden']}")
