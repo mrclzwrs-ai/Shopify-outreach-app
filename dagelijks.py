@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import date
 
+import detective
 import outreach_core as oc
 
 
@@ -31,6 +32,7 @@ def main():
     afzender = omgeving("SENDER_NAME", "Marcel – ShopReels")
     serp = omgeving("SERPAPI_KEY")
     rapport_naar = omgeving("RAPPORT_NAAR", smtp_user)
+    ai_sleutel = omgeving("ANTHROPIC_API_KEY")
 
     bron = inst.get("bron", "shopify-lijst")
     nodig = [("SMTP_USER", smtp_user), ("SMTP_PASSWORD", wachtwoord)]
@@ -98,10 +100,17 @@ def main():
 
     print(f"Gevonden: {len(leads)} winkels met een echt adres ({gebruikt} zoekopdrachten)")
 
+    # De detective schrijft per winkel een persoonlijke mail (of valt terug op de standaardmail).
+    print("Detective aan het werk" + ("" if ai_sleutel else " (geen AI-sleutel: standaardmails)"))
+    mails = []
+    for lead in leads:
+        onderwerp, tekst, rapportje = detective.maak_beste_mail(lead, afzender, link, ai_sleutel)
+        mails.append((onderwerp, tekst, rapportje))
+        print(f"  {lead['domein']}: {lead.get('detective', '')}")
+
     resultaten = []
     if stand == "echt":
-        for n, lead in enumerate(leads):
-            onderwerp, tekst = oc.maak_mail(lead["taal"], lead["winkelnaam"], afzender, link)
+        for n, (lead, (onderwerp, tekst, _)) in enumerate(zip(leads, mails)):
             ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, afzender, lead["email"], onderwerp, tekst)
             resultaten.append((lead, "verstuurd" if ok else f"mislukt: {melding[:80]}"))
             print(f"{'OK ' if ok else 'MIS'} {lead['email']}")
@@ -115,6 +124,7 @@ def main():
         f"Outreach-overzicht {date.today().strftime('%d-%m-%Y')}",
         f"Stand: {'ECHT – deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
         f"Winkels met een echt e-mailadres: {len(leads)}",
+        f"Persoonlijke mails door de detective: {sum(1 for m in mails if m[2])} van {len(mails)}",
         f"Overgeslagen: {len(overgeslagen)} (geen adres, geen Shopify, te klein of al eerder contact)",
         f"Zoekopdrachten gebruikt: {gebruikt}",
         "",
@@ -122,11 +132,13 @@ def main():
     for lead, status in resultaten:
         regels.append(f"- {lead['winkelnaam']} | {lead['website']} | {lead['email']} | "
                       f"{oc.MARKTEN.get(lead.get('markt'), {}).get('naam', lead.get('markt'))} | {lead['niche']} | {status}")
-    if leads:
-        voorbeeld = leads[0]
-        onderwerp, tekst = oc.maak_mail(voorbeeld["taal"], voorbeeld["winkelnaam"], afzender, link)
-        regels += ["", "Zo ziet de mail eruit (voorbeeld voor de eerste winkel):", "",
-                   f"Onderwerp: {onderwerp}", "", tekst]
+    # Alle mails voluit, zodat je ze kunt meelezen.
+    for (lead, _), (onderwerp, tekst, rapportje) in zip(resultaten, mails):
+        regels += ["", "=" * 60, f"{lead['winkelnaam']} – {lead['website']} – aan: {lead['email']}"]
+        regels.append(f"Detective: {lead.get('detective', '')}")
+        if rapportje:
+            regels += ["", "RAPPORT:", rapportje]
+        regels += ["", f"Onderwerp: {onderwerp}", "", tekst]
     rapport = "\n".join(regels)
     print("\n" + rapport)
 
