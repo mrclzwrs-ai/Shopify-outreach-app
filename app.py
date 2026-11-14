@@ -79,23 +79,37 @@ if menu == "🔍 Winkels zoeken":
              "producten is, en zoekt daar een **echt** e-mailadres. Winkels zonder adres, en winkels "
              "die we al eens gemaild hebben, worden overgeslagen.")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        markt = st.selectbox("Land:", list(oc.MARKTEN.keys()),
-                             format_func=lambda k: oc.MARKTEN[k]["naam"])
-    with c2:
-        taal = oc.MARKTEN[markt]["taal"]
-        suggesties = INST.get("branches", {}).get(taal, [])
-        niche = st.text_input("Branche (in de taal van het land):",
-                              value=suggesties[0] if suggesties else "jewelry")
-        if suggesties:
-            st.caption("Ideeën: " + ", ".join(suggesties))
+    bron = st.radio("Waar zoeken?", ["Shopify-lijst (gratis, alle soorten winkels)", "Google (kost zoekopdrachten)"],
+                    horizontal=True)
+    lijst = bron.startswith("Shopify")
+
+    if lijst:
+        landen = st.multiselect("Landen:", list(oc.MARKTEN.keys()), default=["NL", "BE", "US", "UK"],
+                                format_func=lambda k: oc.MARKTEN[k]["naam"])
+        niche = st.text_input("Branche (mag leeg blijven = alle soorten winkels):", value="")
+        st.caption("De mail gaat automatisch in de taal van het land. Let op: Nederlandse en Belgische "
+                   "winkels zijn er veel minder dan Amerikaanse, dus die komen minder vaak voorbij.")
+    else:
+        c1, c2 = st.columns(2)
+        with c1:
+            markt = st.selectbox("Land:", list(oc.MARKTEN.keys()),
+                                 format_func=lambda k: oc.MARKTEN[k]["naam"])
+        with c2:
+            taal = oc.MARKTEN[markt]["taal"]
+            suggesties = INST.get("branches", {}).get(taal, [])
+            niche = st.text_input("Branche (in de taal van het land):",
+                                  value=suggesties[0] if suggesties else "jewelry")
+            if suggesties:
+                st.caption("Ideeën: " + ", ".join(suggesties))
     aantal = int(st.number_input("Hoeveel winkels wil je vinden? (1 tot 20)", min_value=1, max_value=20, value=5, step=1))
-    st.caption("Elke zoekronde kost 1 van je SerpApi-zoekopdrachten. De app doet er maximaal 3.")
+    if not lijst:
+        st.caption("Elke zoekronde kost 1 van je SerpApi-zoekopdrachten. De app doet er maximaal 3.")
 
     if st.button("🔎 Zoeken", type="primary"):
-        if not st.session_state.serpapi_key:
+        if not lijst and not st.session_state.serpapi_key:
             st.error("Er is nog geen SerpApi-sleutel. Zet hem in de kluis of bij Instellingen.")
+        elif lijst and not landen:
+            st.error("Kies minstens één land.")
         else:
             with st.spinner("Even kijken wie we al gemaild hebben..."):
                 adressen, domeinen, fout = bekende_contacten()
@@ -113,11 +127,16 @@ if menu == "🔍 Winkels zoeken":
                 regels.append(tekst)
                 log_vak.code("\n".join(regels[-12:]))
 
-            with st.spinner("Winkels zoeken en bekijken... (dit duurt een paar minuten)"):
-                gevonden, overgeslagen, gebruikt, fout = oc.zoek_leads(
-                    st.session_state.serpapi_key, niche, markt, max_leads=aantal,
-                    max_zoekopdrachten=3, bekende_adressen=adressen,
-                    bekende_domeinen=domeinen, log=log)
+            with st.spinner("Winkels zoeken en bekijken... (dit duurt een paar minuten, laat de pagina open)"):
+                if lijst:
+                    gevonden, overgeslagen, gebruikt, fout = oc.zoek_leads_shopifylijst(
+                        max_leads=aantal, landen=landen, niche=niche.strip(),
+                        bekende_adressen=adressen, bekende_domeinen=domeinen, log=log)
+                else:
+                    gevonden, overgeslagen, gebruikt, fout = oc.zoek_leads(
+                        st.session_state.serpapi_key, niche, markt, max_leads=aantal,
+                        max_zoekopdrachten=3, bekende_adressen=adressen,
+                        bekende_domeinen=domeinen, log=log)
             log_vak.empty()
             if fout:
                 st.error("Fout bij zoeken: " + fout)
@@ -126,15 +145,17 @@ if menu == "🔍 Winkels zoeken":
                 "Winkel": l["winkelnaam"],
                 "Website": l["website"],
                 "E-mail": l["email"],
-                "Land": markt,
+                "Land": l.get("markt", ""),
                 "Taal": l["taal"],
-                "Branche": niche,
+                "Branche": l.get("niche", niche) or "alles",
                 "Status": "Klaar",
                 "Domein": l["domein"],
             } for l in gevonden])
             st.session_state.leads = pd.concat([st.session_state.leads, nieuw], ignore_index=True)
-            st.success(f"{len(gevonden)} winkels met een echt adres gevonden. "
-                       f"{len(overgeslagen)} overgeslagen. ({gebruikt} zoekopdrachten gebruikt)")
+            tekst = f"{len(gevonden)} winkels met een echt adres gevonden. {len(overgeslagen)} overgeslagen."
+            if not lijst:
+                tekst += f" ({gebruikt} zoekopdrachten gebruikt)"
+            st.success(tekst)
             with st.expander("Wat heeft hij precies gedaan?"):
                 st.code("\n".join(regels) or "Niets gevonden.")
             if overgeslagen:
@@ -226,9 +247,12 @@ elif menu == "🤖 Automatisch":
         st.info("Stand: **PROEF**. Er gaat nog niets naar winkels. Je krijgt elke werkdag een "
                 "overzicht in je mailbox van welke winkels hij gevonden heeft en hoe de mail eruitziet.")
     st.write("**Landen:** " + ", ".join(oc.MARKTEN[m]["naam"] for m in INST.get("markten", [])))
-    for taal, lijst in INST.get("branches", {}).items():
-        if any(oc.MARKTEN[m]["taal"] == taal for m in INST.get("markten", [])):
-            st.write(f"**Branches ({taal}):** " + ", ".join(lijst))
+    if INST.get("bron", "shopify-lijst") == "google":
+        for taal, lijst in INST.get("branches", {}).items():
+            if any(oc.MARKTEN[m]["taal"] == taal for m in INST.get("markten", [])):
+                st.write(f"**Branches ({taal}):** " + ", ".join(lijst))
+    else:
+        st.write("**Soort winkels:** alle soorten (uit de gratis Shopify-lijst)")
     st.caption("Wil je iets veranderen (aanzetten, ander aantal, andere branches)? Vraag het Claude.")
 
 
