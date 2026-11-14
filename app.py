@@ -4,7 +4,12 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+import importlib
+
 import outreach_core as oc
+
+# Na een update altijd de nieuwste versie van de zoekmotor gebruiken (geen herstart nodig).
+oc = importlib.reload(oc)
 
 st.set_page_config(page_title="ShopReels Outreach", page_icon="🚀", layout="wide")
 
