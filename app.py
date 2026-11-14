@@ -130,6 +130,8 @@ if menu == "🔍 Winkels zoeken":
             st.session_state.leads = pd.concat([st.session_state.leads, nieuw], ignore_index=True)
             st.success(f"{len(gevonden)} winkels met een echt adres gevonden. "
                        f"{len(overgeslagen)} overgeslagen. ({gebruikt} zoekopdrachten gebruikt)")
+            with st.expander("Wat heeft hij precies gedaan?"):
+                st.code("\n".join(regels) or "Niets gevonden.")
             if overgeslagen:
                 with st.expander("Waarom zijn winkels overgeslagen?"):
                     st.dataframe(pd.DataFrame(overgeslagen), hide_index=True, width="stretch")

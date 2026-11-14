@@ -49,7 +49,7 @@ MARKTEN = {
 
 # Grote platforms en marktplaatsen: dat zijn geen kleine winkels.
 OVERSLAAN_DOMEINEN = {
-    "shopify.com", "apps.shopify.com", "myshopify.com", "amazon.com", "amazon.nl",
+    "shopify.com", "apps.shopify.com", "amazon.com", "amazon.nl",
     "amazon.de", "amazon.co.uk", "etsy.com", "ebay.com", "bol.com", "zalando.nl",
     "facebook.com", "instagram.com", "pinterest.com", "youtube.com", "tiktok.com",
     "reddit.com", "linkedin.com", "wikipedia.org", "trustpilot.com", "marktplaats.nl",
@@ -373,7 +373,7 @@ def bekijk_winkel(url, sessie=None):
 # Zoeken via SerpApi
 # ---------------------------------------------------------------------------
 
-def zoek_websites(api_key, niche, markt="US", pagina=0):
+def zoek_websites(api_key, niche, markt="US", pagina=0, log=None):
     """
     Zoekt in Google naar Shopify-winkels in een branche.
     Geeft (lijst met website-urls, foutmelding of None) terug. Kost 1 zoekopdracht.
@@ -382,19 +382,17 @@ def zoek_websites(api_key, niche, markt="US", pagina=0):
     # Drie manieren van zoeken, om de beurt. Elke winkel wordt daarna toch
     # gecontroleerd, dus een zoekresultaat dat geen Shopify is valt vanzelf af.
     varianten = [
-        '"{niche}" "powered by shopify"',
-        '{niche} inurl:collections',
-        '{niche} inurl:products',
+        'site:myshopify.com {niche}',
+        '{niche} "powered by shopify"',
+        '{niche} shop inurl:collections',
     ]
     vraag = varianten[pagina % len(varianten)].format(niche=niche)
-    vraag += " -site:shopify.com -site:myshopify.com -site:etsy.com -site:amazon.com"
     params = {
         "engine": "google",
         "q": vraag,
         "api_key": api_key,
         "gl": m["gl"],
         "hl": m["hl"],
-        "num": 10,
         "start": (pagina // len(varianten)) * 10,
     }
     try:
@@ -404,6 +402,8 @@ def zoek_websites(api_key, niche, markt="US", pagina=0):
         return [], f"Zoeken mislukt: {ex}"
     if "error" in data:
         if "hasn't returned any results" in data["error"]:
+            if log:
+                log(f"Google: '{vraag}' -> 0 resultaten")
             return [], None
         return [], data["error"]
 
@@ -415,6 +415,9 @@ def zoek_websites(api_key, niche, markt="US", pagina=0):
             continue
         gezien.add(dom)
         urls.append(basis_url(link))
+    if log:
+        log(f"Google: '{vraag}' -> {len(data.get('organic_results', []))} resultaten, "
+            f"{len(urls)} bruikbare websites")
     return urls, None
 
 
@@ -555,12 +558,12 @@ def zoek_leads(api_key, niche, markt, max_leads=10, max_zoekopdrachten=2, startp
     taal = MARKTEN.get(markt, MARKTEN["US"])["taal"]
 
     for p in range(startpagina, startpagina + max_zoekopdrachten):
-        urls, fout = zoek_websites(api_key, niche, markt, pagina=p)
+        urls, fout = zoek_websites(api_key, niche, markt, pagina=p, log=log)
         gebruikt += 1
         if fout:
             return leads, overgeslagen, gebruikt, fout
         if not urls:
-            break
+            continue
         for url in urls:
             dom = domein_van(url)
             if dom in gezien:
