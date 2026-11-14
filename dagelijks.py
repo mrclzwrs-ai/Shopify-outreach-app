@@ -32,8 +32,11 @@ def main():
     serp = omgeving("SERPAPI_KEY")
     rapport_naar = omgeving("RAPPORT_NAAR", smtp_user)
 
-    ontbreekt = [n for n, w in [("SMTP_USER", smtp_user), ("SMTP_PASSWORD", wachtwoord),
-                                ("SERPAPI_KEY", serp)] if not w]
+    bron = inst.get("bron", "shopify-lijst")
+    nodig = [("SMTP_USER", smtp_user), ("SMTP_PASSWORD", wachtwoord)]
+    if bron == "google":
+        nodig.append(("SERPAPI_KEY", serp))
+    ontbreekt = [n for n, w in nodig if not w]
     if ontbreekt:
         print("Deze geheimen ontbreken in GitHub:", ", ".join(ontbreekt))
         sys.exit(1)
@@ -53,38 +56,45 @@ def main():
             stand = "proef"
     print(f"Al bekend in de mailbox: {len(adressen)} adressen, {len(domeinen)} domeinen")
 
-    # Elke dag een andere combinatie van markt en branche, zodat we niet steeds
-    # dezelfde winkels vinden.
-    combinaties = []
-    for markt in inst.get("markten", ["US"]):
-        taal = oc.MARKTEN[markt]["taal"]
-        for branche in inst.get("branches", {}).get(taal, []):
-            combinaties.append((markt, branche))
-    random.Random(42).shuffle(combinaties)
-    dag = date.today().toordinal()
-    start = (dag * 3) % len(combinaties)
-    ronde = (dag * 3) // len(combinaties)
-
     leads, overgeslagen, gebruikt = [], [], 0
-    i = 0
-    while len(leads) < max_mails and gebruikt < max_zoek and i < len(combinaties):
-        markt, branche = combinaties[(start + i) % len(combinaties)]
-        i += 1
-        print(f"Zoeken: {branche} in {oc.MARKTEN[markt]['naam']}")
-        nieuw, over, g, fout = oc.zoek_leads(
-            serp, branche, markt,
-            max_leads=max_mails - len(leads),
-            max_zoekopdrachten=min(2, max_zoek - gebruikt),
-            startpagina=(ronde * 2) % 9,
-            bekende_adressen=adressen | {l["email"] for l in leads},
-            bekende_domeinen=domeinen | {l["domein"] for l in leads},
-        )
-        gebruikt += g
-        leads += nieuw
-        overgeslagen += over
+    if bron != "google":
+        print("Zoeken in de Shopify-lijst, landen:", ", ".join(inst.get("markten", [])))
+        leads, overgeslagen, gebruikt, fout = oc.zoek_leads_shopifylijst(
+            max_leads=max_mails, landen=inst.get("markten", ["US"]), niche="",
+            max_bezoeken=int(inst.get("bezoeken_per_dag", 400)),
+            bekende_adressen=adressen, bekende_domeinen=domeinen)
         if fout:
             print("Fout bij zoeken:", fout)
-            break
+    else:
+        # Elke dag een andere combinatie van markt en branche.
+        combinaties = []
+        for markt in inst.get("markten", ["US"]):
+            taal = oc.MARKTEN[markt]["taal"]
+            for branche in inst.get("branches", {}).get(taal, []):
+                combinaties.append((markt, branche))
+        random.Random(42).shuffle(combinaties)
+        dag = date.today().toordinal()
+        start = (dag * 3) % len(combinaties)
+        ronde = (dag * 3) // len(combinaties)
+        i = 0
+        while len(leads) < max_mails and gebruikt < max_zoek and i < len(combinaties):
+            markt, branche = combinaties[(start + i) % len(combinaties)]
+            i += 1
+            print(f"Zoeken: {branche} in {oc.MARKTEN[markt]['naam']}")
+            nieuw, over, g, fout = oc.zoek_leads(
+                serp, branche, markt,
+                max_leads=max_mails - len(leads),
+                max_zoekopdrachten=min(2, max_zoek - gebruikt),
+                startpagina=(ronde * 2) % 9,
+                bekende_adressen=adressen | {l["email"] for l in leads},
+                bekende_domeinen=domeinen | {l["domein"] for l in leads},
+            )
+            gebruikt += g
+            leads += nieuw
+            overgeslagen += over
+            if fout:
+                print("Fout bij zoeken:", fout)
+                break
 
     print(f"Gevonden: {len(leads)} winkels met een echt adres ({gebruikt} zoekopdrachten)")
 
@@ -111,7 +121,7 @@ def main():
     ]
     for lead, status in resultaten:
         regels.append(f"- {lead['winkelnaam']} | {lead['website']} | {lead['email']} | "
-                      f"{oc.MARKTEN[lead['markt']]['naam']} | {lead['niche']} | {status}")
+                      f"{oc.MARKTEN.get(lead.get('markt'), {}).get('naam', lead.get('markt'))} | {lead['niche']} | {status}")
     if leads:
         voorbeeld = leads[0]
         onderwerp, tekst = oc.maak_mail(voorbeeld["taal"], voorbeeld["winkelnaam"], afzender, link)

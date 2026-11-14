@@ -203,7 +203,7 @@ def echte_link(item):
         if "://" not in k:
             k = "https://" + k
         dom = domein_van(k)
-        if not dom:
+        if not dom or not re.fullmatch(r"[a-z0-9.\-]+\.[a-z]{2,}", dom):
             continue
         if dom.startswith("google.") or ".google." in dom:
             qs = parse_qs(urlparse(k).query)
@@ -231,7 +231,20 @@ def _sessie():
     return s
 
 
-LAATSTE_FOUT = {"tekst": ""}
+import threading
+
+_DRAAD = threading.local()
+
+
+class _LaatsteFout:
+    def __getitem__(self, _):
+        return getattr(_DRAAD, "fout", "")
+
+    def __setitem__(self, _, waarde):
+        _DRAAD.fout = waarde
+
+
+LAATSTE_FOUT = _LaatsteFout()
 
 
 def _haal(sessie, url, timeout=12):
@@ -399,7 +412,43 @@ def past_bij_branche(niche, homepage_tekst, producten_json):
     return any(re.search(r"\b" + re.escape(w), tekst) for w in woorden)
 
 
-def bekijk_winkel(url, sessie=None, niche=None):
+TLD_TAAL = {".nl": "NL", ".be": "NL", ".de": "DE", ".at": "DE", ".es": "ES",
+            ".co.uk": "EN", ".uk": "EN", ".us": "EN", ".com.au": "EN", ".ca": "EN", ".ie": "EN"}
+
+
+def taal_van_winkel(domein, homepage_tekst):
+    """NL, EN, DE, ES of iets anders (bijv. FR). Eerst de taal die de site zelf opgeeft."""
+    m = re.search(r"<html[^>]*\blang=[\"']?([a-zA-Z]{2})", homepage_tekst or "", re.I)
+    if m:
+        return m.group(1).upper()
+    for tld, taal in TLD_TAAL.items():
+        if domein.endswith(tld):
+            return taal
+    return "EN"
+
+
+# Markt-code in de app -> landcode die Shopify gebruikt
+MARKT_NAAR_LAND = {"NL": "NL", "BE": "BE", "US": "US", "UK": "GB", "DE": "DE", "ES": "ES"}
+LAND_NAAR_MARKT = {v: k for k, v in MARKT_NAAR_LAND.items()}
+
+
+def land_van_winkel(sessie, basis, domein):
+    """Land waar de winkel gevestigd is, uit het openbare Shopify-bestandje /meta.json."""
+    r = _haal(sessie, basis + "/meta.json")
+    if r is not None:
+        try:
+            land = (r.json().get("country") or "").upper()
+            if land:
+                return land
+        except ValueError:
+            pass
+    for tld, land in ((".nl", "NL"), (".be", "BE"), (".de", "DE"), (".es", "ES"), (".co.uk", "GB"), (".uk", "GB")):
+        if domein.endswith(tld):
+            return land
+    return ""
+
+
+def bekijk_winkel(url, sessie=None, niche=None, talen=None, landen=None):
     """
     Bezoekt een winkel en geeft een dict terug:
     domein, website, winkelnaam, shopify (bool), producten (int of None), email, reden
@@ -429,6 +478,23 @@ def bekijk_winkel(url, sessie=None, niche=None):
 
     tekst = home.text
     info["winkelnaam"] = winkelnaam_uit_html(tekst, domein)
+    info["taal"] = taal_van_winkel(domein, tekst)
+    if landen:
+        land = land_van_winkel(sessie, basis, domein)
+        info["land"] = land
+        markt = LAND_NAAR_MARKT.get(land)
+        if not markt or markt not in landen:
+            info["reden"] = f"Ander land ({land or 'onbekend'})"
+            return info
+        info["markt"] = markt
+        verwacht = MARKTEN[markt]["taal"]
+        if markt == "BE" and info["taal"] not in ("NL",):
+            info["reden"] = f"Belgische winkel, maar niet in het Nederlands ({info['taal']})"
+            return info
+        info["taal"] = verwacht
+    if talen and info["taal"] not in talen:
+        info["reden"] = f"Andere taal ({info['taal']})"
+        return info
     koppen = {k.lower() for k in home.headers.keys()}
     info["shopify"] = any(k in tekst for k in SHOPIFY_KENMERKEN) or \
         bool(koppen & {"x-shopid", "x-shopify-stage", "x-sorting-hat-shopid", "x-storefront-renderer-rendered"}) or \
@@ -696,6 +762,118 @@ def zoek_leads(api_key, niche, markt, max_leads=10, max_zoekopdrachten=2, startp
                 return leads, overgeslagen, gebruikt, None
             time.sleep(random.uniform(0.5, 1.5))
     return leads, overgeslagen, gebruikt, None
+
+
+# ---------------------------------------------------------------------------
+# Zoeken via de Shopify-lijst (Common Crawl, gratis openbare webverzameling)
+# ---------------------------------------------------------------------------
+
+CC_INDEX = "https://index.commoncrawl.org"
+
+
+def _cc_indexen(sessie):
+    r = sessie.get(CC_INDEX + "/collinfo.json", timeout=30)
+    r.raise_for_status()
+    return [c["cdx-api"] for c in r.json()]
+
+
+def shopify_adressen(aantal=300, log=print, rnd=None):
+    """
+    Haalt een willekeurig stuk uit de lijst van alle winkels met een
+    iets.myshopify.com-adres die Common Crawl ooit tegenkwam.
+    Geeft (lijst met https://iets.myshopify.com, foutmelding of None).
+    """
+    rnd = rnd or random.Random()
+    sessie = _sessie()
+    try:
+        indexen = _cc_indexen(sessie)
+    except Exception as ex:
+        return [], f"Shopify-lijst niet bereikbaar: {ex}"
+
+    hosts = []
+    for poging in range(4):
+        api = indexen[rnd.randrange(0, min(4, len(indexen)))]
+        try:
+            r = sessie.get(api, params={"url": "*.myshopify.com", "output": "json",
+                                        "showNumPages": "true"}, timeout=60)
+            paginas = int(r.json().get("pages", 1))
+            pagina = rnd.randrange(0, max(1, paginas))
+            r = sessie.get(api, params={"url": "*.myshopify.com", "output": "json",
+                                        "fl": "url", "page": pagina}, timeout=90)
+            r.raise_for_status()
+        except Exception as ex:
+            log(f"Shopify-lijst: poging {poging + 1} mislukt ({type(ex).__name__}), opnieuw...")
+            time.sleep(3)
+            continue
+        gezien = set()
+        for regel in r.text.splitlines():
+            try:
+                u = json.loads(regel).get("url", "")
+            except ValueError:
+                continue
+            host = domein_van(u)
+            if host.endswith(".myshopify.com") and host.count(".") == 2 and host not in gezien:
+                gezien.add(host)
+                hosts.append("https://" + host)
+        log(f"Shopify-lijst: {len(hosts)} winkeladressen opgehaald (blok {pagina} van {paginas})")
+        if len(hosts) >= 30:
+            break
+    rnd.shuffle(hosts)
+    return hosts[:aantal], (None if hosts else "Shopify-lijst gaf geen adressen terug")
+
+
+def zoek_leads_shopifylijst(max_leads=10, landen=("NL", "BE", "US", "UK"), niche="", max_bezoeken=200,
+                            bekende_adressen=None, bekende_domeinen=None, log=print,
+                            gelijktijdig=8):
+    """
+    Zoekt willekeurige actieve Shopify-winkels (elke branche, tenzij niche ingevuld)
+    in de gekozen talen, met een echt e-mailadres.
+    Geeft (leads, overgeslagen, 0 zoekopdrachten, fout).
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    bekende_adressen = set(bekende_adressen or set())
+    bekende_domeinen = set(bekende_domeinen or set())
+    urls, fout = shopify_adressen(aantal=max_bezoeken, log=log)
+    if fout:
+        return [], [], 0, fout
+
+    leads, overgeslagen = [], []
+
+    def werk(u):
+        return bekijk_winkel(u, _sessie(), niche=niche or None, landen=set(landen))
+
+    with ThreadPoolExecutor(max_workers=gelijktijdig) as pool:
+        taken = [pool.submit(werk, u) for u in urls]
+        for taak in as_completed(taken):
+            if len(leads) >= max_leads:
+                break
+            try:
+                info = taak.result()
+            except Exception as ex:
+                overgeslagen.append({"website": "?", "reden": f"Fout: {type(ex).__name__}"})
+                continue
+            if info["reden"]:
+                overgeslagen.append({"website": info["website"], "reden": info["reden"]})
+                continue
+            if al_bekend(info["email"], info["domein"], bekende_adressen, bekende_domeinen) \
+                    or info["domein"] in {l["domein"] for l in leads}:
+                overgeslagen.append({"website": info["website"], "reden": "Al eerder contact"})
+                continue
+            info.update({"niche": niche or "alles"})
+            leads.append(info)
+            log(f"  + {info['winkelnaam']} ({info['website']}) -> {info['email']} [{info['markt']}]")
+        for t in taken:
+            t.cancel()
+
+    # Kort overzicht van de redenen
+    tellers = {}
+    for o in overgeslagen:
+        sleutel = re.sub(r"\s*\(.*\)", "", o["reden"])
+        tellers[sleutel] = tellers.get(sleutel, 0) + 1
+    for reden, n in sorted(tellers.items(), key=lambda x: -x[1]):
+        log(f"  overgeslagen: {n} x {reden}")
+    return leads[:max_leads], overgeslagen, 0, None
 
 
 def laad_instellingen(pad="instellingen.json"):
