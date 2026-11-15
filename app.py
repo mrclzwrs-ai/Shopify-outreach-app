@@ -11,16 +11,55 @@ import outreach_core as oc
 # Na een update altijd de nieuwste versie van de zoekmotor gebruiken (geen herstart nodig).
 oc = importlib.reload(oc)
 
-st.set_page_config(page_title="ShopReels Outreach", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="ShopReels Outreach", page_icon="◆", layout="wide")
 
+# Cockpit-stijl: donker, strak, turquoise accent, oranje voor "let op".
 st.markdown("""
     <style>
-        html, body, [class*="css"] { font-size: 19px !important; }
-        h1 { font-size: 2.1rem !important; font-weight: 700 !important; }
-        h2, h3 { font-size: 1.45rem !important; font-weight: 600 !important; }
-        .stButton>button { font-size: 1.15rem !important; padding: 0.6rem 1.2rem !important;
-                           border-radius: 8px !important; font-weight: 600 !important; }
-        label p { font-size: 1.1rem !important; font-weight: 600 !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+        :root { --cp-bg:#0A0F14; --cp-paneel:#111A22; --cp-lijn:#1B2631; --cp-tekst:#DCE7F0;
+                --cp-grijs:#7FA3BF; --cp-turq:#3FE0C5; --cp-oranje:#F5A623; }
+        html, body, [class*="css"] { font-size: 19px !important; font-family: 'Inter', sans-serif !important; }
+        .stApp { background: var(--cp-bg) !important; }
+        header[data-testid="stHeader"] { background: transparent !important; }
+
+        h1, h2, h3 { font-family: 'JetBrains Mono', monospace !important; font-weight: 500 !important;
+                     letter-spacing: 1px; color: var(--cp-tekst) !important; }
+        h1 { font-size: 1.9rem !important; text-transform: uppercase;
+             border-bottom: 1px solid var(--cp-lijn); padding-bottom: 0.6rem !important; }
+        h2, h3 { font-size: 1.3rem !important; color: var(--cp-grijs) !important; text-transform: uppercase; }
+        label p { font-size: 1.05rem !important; font-weight: 500 !important; color: var(--cp-grijs) !important; }
+
+        section[data-testid="stSidebar"] { background: #070B0F !important; border-right: 1px solid var(--cp-lijn); }
+        section[data-testid="stSidebar"] h1 { font-size: 1.1rem !important; color: var(--cp-turq) !important;
+                                              border-bottom: none; }
+
+        div[data-testid="stMetric"] { background: var(--cp-paneel); border: 1px solid var(--cp-lijn);
+                                      border-radius: 10px; padding: 14px 16px; }
+        span[data-baseweb="tag"], span[data-baseweb="tag"] * { color: #0A0F14 !important; }
+        [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { font-family: 'JetBrains Mono', monospace !important;
+                                             text-transform: uppercase; font-size: 0.8rem !important;
+                                             color: var(--cp-grijs) !important; letter-spacing: 1px; }
+        div[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important;
+                                           color: var(--cp-turq) !important; font-size: 2.4rem !important; }
+
+        .stButton>button, .stDownloadButton>button {
+            font-family: 'JetBrains Mono', monospace !important; text-transform: uppercase; letter-spacing: 1px;
+            font-size: 1.05rem !important; padding: 0.65rem 1.3rem !important; border-radius: 8px !important;
+            font-weight: 500 !important; background: transparent !important;
+            border: 1px solid var(--cp-turq) !important; color: var(--cp-turq) !important; }
+        .stButton>button:hover, .stDownloadButton>button:hover {
+            background: rgba(63,224,197,0.12) !important; }
+        .stButton>button[kind="primary"] { background: var(--cp-turq) !important; color: var(--cp-bg) !important; }
+        .stButton>button[kind="primary"]:hover { background: #6BEBD5 !important; }
+
+        div[data-testid="stProgress"] div[role="progressbar"] > div > div { background: var(--cp-turq) !important; }
+        div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
+            border: 1px solid var(--cp-lijn); border-radius: 10px; }
+        div[data-testid="stExpander"] { border: 1px solid var(--cp-lijn) !important; border-radius: 10px;
+                                        background: var(--cp-paneel); }
+        code, pre { font-family: 'JetBrains Mono', monospace !important; }
+        hr { border-color: var(--cp-lijn) !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -57,24 +96,24 @@ def bekende_contacten():
 
 
 # ---------------------------------------------------------------------------
-st.sidebar.title("🚀 ShopReels Outreach")
+st.sidebar.title("SHOPREELS / OUTREACH")
 menu = st.sidebar.radio("Kies een pagina", [
-    "🔍 Winkels zoeken",
-    "🚀 Versturen",
-    "✉️ De mail",
-    "🤖 Automatisch",
-    "⚙️ Instellingen",
+    "Winkels zoeken",
+    "Versturen",
+    "De mail",
+    "Automatisch",
+    "Instellingen",
 ])
 leads = st.session_state.leads
 st.sidebar.markdown("---")
-st.sidebar.metric("Gevonden winkels", len(leads))
+st.sidebar.metric("Gevonden", len(leads))
 if len(leads):
     st.sidebar.metric("Verstuurd", int((leads["Status"] == "Verstuurd").sum()))
 
 
 # ---------------------------------------------------------------------------
-if menu == "🔍 Winkels zoeken":
-    st.title("🔍 Winkels zoeken")
+if menu == "Winkels zoeken":
+    st.title("Winkels zoeken")
     st.write("De app zoekt Shopify-winkels, kijkt op hun eigen site of het een echte winkel met "
              "producten is, en zoekt daar een **echt** e-mailadres. Winkels zonder adres, en winkels "
              "die we al eens gemaild hebben, worden overgeslagen.")
@@ -105,7 +144,7 @@ if menu == "🔍 Winkels zoeken":
     if not lijst:
         st.caption("Elke zoekronde kost 1 van je SerpApi-zoekopdrachten. De app doet er maximaal 3.")
 
-    if st.button("🔎 Zoeken", type="primary"):
+    if st.button("Zoeken", type="primary"):
         if not lijst and not st.session_state.serpapi_key:
             st.error("Er is nog geen SerpApi-sleutel. Zet hem in de kluis of bij Instellingen.")
         elif lijst and not landen:
@@ -174,18 +213,18 @@ if menu == "🔍 Winkels zoeken":
 
 
 # ---------------------------------------------------------------------------
-elif menu == "🚀 Versturen":
-    st.title("🚀 Versturen")
+elif menu == "Versturen":
+    st.title("Versturen")
     leads = st.session_state.leads
     if not len(leads):
-        st.info("Zoek eerst winkels op de pagina 🔍 Winkels zoeken.")
+        st.info("Zoek eerst winkels op de pagina Winkels zoeken.")
     else:
         klaar = leads[(leads["Status"] == "Klaar") & (leads["Versturen"])]
         st.write(f"Er staan **{len(klaar)}** winkels klaar met een vinkje.")
         st.caption("Tussen elke mail wacht de app ongeveer een halve minuut, zodat Gmail je "
                    "adres niet als spam ziet. Houd deze pagina open tot hij klaar is.")
         hoeveel = st.number_input("Hoeveel nu versturen?", 1, 25, min(10, max(1, len(klaar))))
-        if st.button("🚀 Start", type="primary", disabled=len(klaar) == 0):
+        if st.button("Start", type="primary", disabled=len(klaar) == 0):
             if not st.session_state.smtp_password:
                 st.error("Er is nog geen app-wachtwoord ingevuld (kluis of Instellingen).")
             else:
@@ -217,14 +256,14 @@ elif menu == "🚀 Versturen":
                     status.success("Klaar!")
         st.subheader("Overzicht")
         st.dataframe(leads.drop(columns=["Domein"]), hide_index=True, width="stretch")
-        st.download_button("⬇️ Lijst downloaden (CSV)",
+        st.download_button("Lijst downloaden (CSV)",
                            leads.to_csv(index=False).encode("utf-8"),
                            f"leads-{datetime.now():%Y-%m-%d}.csv", "text/csv")
 
 
 # ---------------------------------------------------------------------------
-elif menu == "✉️ De mail":
-    st.title("✉️ Zo ziet de mail eruit")
+elif menu == "De mail":
+    st.title("Zo ziet de mail eruit")
     gekozen = st.radio("Taal:", ["NL", "EN", "DE", "ES"], horizontal=True)
     onderwerp, tekst = oc.maak_mail(gekozen, "Voorbeeldwinkel", st.session_state.sender_name,
                                     st.session_state.link)
@@ -235,8 +274,8 @@ elif menu == "✉️ De mail":
 
 
 # ---------------------------------------------------------------------------
-elif menu == "🤖 Automatisch":
-    st.title("🤖 Automatisch elke werkdag")
+elif menu == "Automatisch":
+    st.title("Automatisch elke werkdag")
     stand = INST.get("stand", "proef")
     st.write("Elke werkdag om ongeveer **9:15** zoekt de app zelf nieuwe winkels "
              "(dat draait bij GitHub, dus je iPad hoeft niet aan te staan).")
@@ -257,8 +296,8 @@ elif menu == "🤖 Automatisch":
 
 
 # ---------------------------------------------------------------------------
-elif menu == "⚙️ Instellingen":
-    st.title("⚙️ Instellingen")
+elif menu == "Instellingen":
+    st.title("Instellingen")
     st.session_state.sender_name = st.text_input("Afzendernaam:", st.session_state.sender_name)
     st.session_state.smtp_user = st.text_input("Afzender e-mailadres:", st.session_state.smtp_user)
     st.session_state.smtp_password = st.text_input("App-wachtwoord (16 tekens):",
@@ -270,7 +309,7 @@ elif menu == "⚙️ Instellingen":
     st.markdown("---")
     st.subheader("Testmail")
     test_adres = st.text_input("Testmail sturen naar:", st.session_state.smtp_user)
-    if st.button("✉️ Stuur testmail"):
+    if st.button("Stuur testmail"):
         onderwerp, tekst = oc.maak_mail("NL", "Voorbeeldwinkel", st.session_state.sender_name,
                                         st.session_state.link)
         ok, melding = oc.verstuur_mail(st.session_state.smtp_user, st.session_state.smtp_password,
@@ -282,7 +321,7 @@ elif menu == "⚙️ Instellingen":
             st.error("Niet gelukt: " + melding)
 
     st.subheader("Mailbox-controle")
-    if st.button("🔎 Controleer wie we al gemaild hebben"):
+    if st.button("Controleer wie we al gemaild hebben"):
         adressen, domeinen, fout = bekende_contacten()
         if fout:
             st.error(fout)
