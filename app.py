@@ -58,6 +58,35 @@ st.markdown("""
             border: 1px solid var(--cp-lijn); border-radius: 10px; }
         div[data-testid="stExpander"] { border: 1px solid var(--cp-lijn) !important; border-radius: 10px;
                                         background: var(--cp-paneel); }
+        .stApp { background-image:
+                    linear-gradient(rgba(63,224,197,0.035) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(63,224,197,0.035) 1px, transparent 1px) !important;
+                 background-size: 44px 44px !important; }
+        iframe { border: none !important; }
+
+        /* Menu als cockpit-knoppen in plaats van rondjes */
+        section[data-testid="stSidebar"] div[data-testid="stRadio"],
+        section[data-testid="stSidebar"] div[data-testid="stRadio"] > div,
+        section[data-testid="stSidebar"] [data-testid="stRadioGroup"] > div,
+        section[data-testid="stSidebar"] label[data-testid="stRadioOption"],
+        section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div[role="radiogroup"]) { width: 100% !important; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] { gap: 8px; display: flex; flex-direction: column; width: 100%; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {
+            width: 100%; box-sizing: border-box; display: flex; background: #0D141B; border: 1px solid var(--cp-lijn); border-left: 3px solid var(--cp-lijn);
+            border-radius: 0 8px 8px 0; padding: 12px 14px !important; margin: 0 !important; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label > div > div:not([data-testid="stMarkdownContainer"]) { display: none !important; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label p {
+            font-family: 'JetBrains Mono', monospace !important; text-transform: uppercase; letter-spacing: 1.5px;
+            font-size: 0.95rem !important; color: var(--cp-grijs) !important; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label[data-selected="true"] {
+            border-left-color: var(--cp-turq); background: rgba(63,224,197,0.08); }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label[data-selected="true"] p { color: var(--cp-turq) !important; }
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+            font-family: 'JetBrains Mono', monospace !important; font-size: 0.75rem !important;
+            letter-spacing: 2px; text-transform: uppercase; }
+
+        /* Inhoud in een paneel met hoekjes */
+        .block-container { max-width: 1150px; }
         code, pre { font-family: 'JetBrains Mono', monospace !important; }
         hr { border-color: var(--cp-lijn) !important; }
     </style>
@@ -97,7 +126,7 @@ def bekende_contacten():
 
 # ---------------------------------------------------------------------------
 st.sidebar.title("SHOPREELS / OUTREACH")
-menu = st.sidebar.radio("Kies een pagina", [
+menu = st.sidebar.radio("Navigatie", [
     "Winkels zoeken",
     "Versturen",
     "De mail",
@@ -112,11 +141,109 @@ if len(leads):
 
 
 # ---------------------------------------------------------------------------
+# Cockpit-kop: wereldklokken van de markten, stand-lampje en aftellen naar de volgende ronde.
+
+
+def cockpit_kop():
+    stand = INST.get("stand", "proef")
+    stand_kleur = "#3FE0C5" if stand == "echt" else "#F5A623"
+    stand_tekst = "ECHT · MAILS GAAN NAAR WINKELS" if stand == "echt" else "PROEF · ALLEEN OVERZICHT NAAR JOU"
+    per_dag = INST.get("mails_per_dag", 10)
+    landen = len(INST.get("markten", []))
+    st.iframe(f"""
+<style>
+  * {{ box-sizing:border-box; margin:0; padding:0; }}
+  body {{ background:transparent; font-family:'JetBrains Mono',monospace; color:#DCE7F0; }}
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+  .paneel {{ position:relative; background:#0D141B; border:1px solid #1B2631; border-radius:10px; padding:14px 16px; }}
+  .paneel::before, .paneel::after {{ content:''; position:absolute; width:14px; height:14px; border-color:#3FE0C5; border-style:solid; }}
+  .paneel::before {{ top:-1px; left:-1px; border-width:2px 0 0 2px; border-radius:10px 0 0 0; }}
+  .paneel::after {{ bottom:-1px; right:-1px; border-width:0 2px 2px 0; border-radius:0 0 10px 0; }}
+  .strook {{ display:flex; flex-wrap:nowrap; gap:10px 18px; align-items:center; justify-content:space-between; }}
+  .lamp {{ display:inline-block; width:11px; height:11px; border-radius:50%; background:{stand_kleur}; margin-right:9px;
+           animation:knipper 1.6s infinite; vertical-align:middle; }}
+  @keyframes knipper {{ 0%,100% {{ opacity:1 }} 50% {{ opacity:.25 }} }}
+  .klein {{ font-size:11px; letter-spacing:1.5px; color:#7FA3BF; }}
+  .stand {{ font-size:13px; letter-spacing:1px; color:{stand_kleur}; }}
+  .teller {{ font-size:26px; color:#3FE0C5; letter-spacing:2px; }}
+  .getallen {{ display:flex; gap:22px; }}
+  .getal b {{ display:block; font-size:22px; font-weight:500; color:#DCE7F0; }}
+  .klokken {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:10px; }}
+  .klok {{ text-align:center; padding:12px 6px; }}
+  .klok svg {{ width:84px; height:84px; display:block; margin:0 auto 6px; }}
+  .tijd {{ font-size:18px; letter-spacing:1px; }}
+  .open {{ font-size:10px; letter-spacing:1.5px; margin-top:3px; }}
+</style>
+<div class="paneel strook">
+  <div>
+    <div class="klein">SYSTEEMSTATUS</div>
+    <div class="stand" style="margin-top:6px"><span class="lamp"></span>{stand_tekst}</div>
+    <div class="getallen" style="margin-top:10px">
+      <div class="getal klein">MAILS/DAG<b>{per_dag}</b></div>
+      <div class="getal klein">LANDEN<b>{landen}</b></div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div class="klein">VOLGENDE RONDE OVER</div>
+    <div class="teller" id="teller">--:--:--</div>
+  </div>
+</div>
+<div class="klokken" id="klokken"></div>
+<script>
+const steden = [
+  ["NL / BELGIË","Europe/Amsterdam"], ["LONDEN","Europe/London"],
+  ["NEW YORK","America/New_York"], ["LOS ANGELES","America/Los_Angeles"]];
+const doos = document.getElementById("klokken");
+steden.forEach(([naam], i) => {{
+  const streepjes = Array.from({{length:12}}, (_, k) => {{
+    const a = k * Math.PI / 6, r1 = k % 3 ? 36 : 32;
+    return `<line x1="${{50+r1*Math.sin(a)}}" y1="${{50-r1*Math.cos(a)}}" x2="${{50+40*Math.sin(a)}}" y2="${{50-40*Math.cos(a)}}"
+             stroke="${{k%3?'#2C3B48':'#7FA3BF'}}" stroke-width="${{k%3?1.5:2.5}}"/>`; }}).join("");
+  doos.insertAdjacentHTML("beforeend", `<div class="paneel klok">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#0A0F14" stroke="#1B2631" stroke-width="2"/>${{streepjes}}
+      <line id="u${{i}}" x1="50" y1="50" x2="50" y2="28" stroke="#DCE7F0" stroke-width="3.5" stroke-linecap="round"/>
+      <line id="m${{i}}" x1="50" y1="50" x2="50" y2="17" stroke="#DCE7F0" stroke-width="2" stroke-linecap="round"/>
+      <line id="s${{i}}" x1="50" y1="56" x2="50" y2="14" stroke="#3FE0C5" stroke-width="1"/>
+      <circle cx="50" cy="50" r="3" fill="#3FE0C5"/></svg>
+    <div class="klein">${{naam}}</div><div class="tijd" id="t${{i}}"></div><div class="open" id="o${{i}}"></div></div>`);
+}});
+function stuk(tz) {{
+  const d = {{}};
+  new Intl.DateTimeFormat("en-GB", {{timeZone:tz, hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit", weekday:"short"}})
+    .formatToParts(new Date()).forEach(p => d[p.type] = p.value);
+  return {{u:+d.hour % 24, m:+d.minute, s:+d.second, dag:d.weekday}};
+}}
+function draai(id, graden) {{ document.getElementById(id).setAttribute("transform", `rotate(${{graden}} 50 50)`); }}
+function volgendeRonde() {{
+  const nu = new Date(); let t = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth(), nu.getUTCDate(), 8, 17, 0));
+  while (t <= nu || t.getUTCDay() === 0 || t.getUTCDay() === 6) t = new Date(t.getTime() + 86400000);
+  let s = Math.floor((t - nu) / 1000); const h = Math.floor(s / 3600); s %= 3600;
+  const pad = n => String(n).padStart(2, "0");
+  return `${{pad(h)}}:${{pad(Math.floor(s / 60))}}:${{pad(s % 60)}}`;
+}}
+function tik() {{
+  steden.forEach(([, tz], i) => {{
+    const k = stuk(tz);
+    draai("u"+i, (k.u % 12) * 30 + k.m * 0.5); draai("m"+i, k.m * 6 + k.s * 0.1); draai("s"+i, k.s * 6);
+    document.getElementById("t"+i).textContent = String(k.u).padStart(2,"0") + ":" + String(k.m).padStart(2,"0");
+    const open = k.dag !== "Sun" && k.u >= 9 && k.u < 18;
+    const o = document.getElementById("o"+i);
+    o.textContent = open ? "● WINKELS OPEN" : "○ WINKELS DICHT";
+    o.style.color = open ? "#3FE0C5" : "#5A6E7E";
+  }});
+  document.getElementById("teller").textContent = volgendeRonde();
+}}
+tik(); setInterval(tik, 1000);
+</script>
+""", height=310)
+
+
+cockpit_kop()
+
+
+# ---------------------------------------------------------------------------
 if menu == "Winkels zoeken":
     st.title("Winkels zoeken")
-    st.write("De app zoekt Shopify-winkels, kijkt op hun eigen site of het een echte winkel met "
-             "producten is, en zoekt daar een **echt** e-mailadres. Winkels zonder adres, en winkels "
-             "die we al eens gemaild hebben, worden overgeslagen.")
 
     bron = st.radio("Waar zoeken?", ["Shopify-lijst (gratis, alle soorten winkels)", "Google (kost zoekopdrachten)"],
                     horizontal=True)
@@ -200,6 +327,11 @@ if menu == "Winkels zoeken":
             if overgeslagen:
                 with st.expander("Waarom zijn winkels overgeslagen?"):
                     st.dataframe(pd.DataFrame(overgeslagen), hide_index=True, width="stretch")
+
+    with st.expander("Hoe werkt het zoeken?"):
+        st.write("De app zoekt Shopify-winkels, kijkt op hun eigen site of het een echte winkel met "
+                 "producten is, en zoekt daar een **echt** e-mailadres. Winkels zonder adres, en winkels "
+                 "die we al eens gemaild hebben, worden overgeslagen.")
 
     if len(st.session_state.leads):
         st.subheader("Gevonden winkels")
