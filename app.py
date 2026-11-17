@@ -295,6 +295,58 @@ if menu == "Logboek":
             st.text(a.get("tekst", ""))
             if a.get("afmelding"):
                 st.caption("Deze winkel krijgt nooit meer een mail van de app.")
+
+    # --- Statistiek van de koopsignalen ---
+    gemaild = [w for d in LOGBOEK for r in d.get("rondes", []) for w in r.get("winkels", [])
+               if w.get("status") == "verstuurd"]
+    pos = [a for a in ANTWOORDEN if not a.get("afmelding")]
+    neg = [a for a in ANTWOORDEN if a.get("afmelding")]
+    s1, s2, s3 = st.columns(3)
+    score = (100 * len(pos) / len(gemaild)) if gemaild else 0
+    s1.metric("Score", f"{score:.1f}%", help="Van alle gemailde winkels: hoeveel procent gaf een positief koopsignaal")
+    s2.metric("Positief", len(pos))
+    s3.metric("Negatief", len(neg))
+
+    if ANTWOORDEN:
+        import altair as alt
+        from urllib.parse import urlparse
+
+        def _week(a):
+            try:
+                d = pd.Timestamp(a.get("binnen") or pd.to_datetime(a.get("datum", ""), dayfirst=True))
+                return f"wk {d.isocalendar().week}"
+            except Exception:
+                return "?"
+
+        rijen = [{"Week": _week(a), "Soort": "Negatief" if a.get("afmelding") else "Positief"} for a in ANTWOORDEN]
+        df = pd.DataFrame(rijen).groupby(["Week", "Soort"]).size().reset_index(name="Aantal")
+        kleuren = alt.Scale(domain=["Positief", "Negatief"], range=["#3FE0C5", "#4A5A68"])
+        st.caption("KOOPSIGNALEN PER WEEK")
+        st.altair_chart(alt.Chart(df).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+            x=alt.X("Week:N", title=None, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("Aantal:Q", title=None, axis=alt.Axis(tickMinStep=1)),
+            color=alt.Color("Soort:N", scale=kleuren, legend=alt.Legend(orient="top", title=None)),
+            xOffset="Soort:N",
+        ).properties(height=220), use_container_width=True)
+
+        # Land van elke reactie opzoeken via het logboek
+        land_van = {}
+        for w in gemaild:
+            for dom in {(w.get("email", "").split("@")[-1]).lower(),
+                        urlparse(w.get("website", "")).netloc.lower().removeprefix("www.")}:
+                if dom:
+                    land_van[dom] = w.get("land")
+        per_land = {}
+        for a in pos:
+            land = land_van.get((a.get("domein") or "").lower().removeprefix("www."))
+            naam = oc.MARKTEN.get(land, {}).get("naam", "Onbekend") if land else "Onbekend"
+            per_land[naam] = per_land.get(naam, 0) + 1
+        if per_land:
+            st.caption("POSITIEVE KOOPSIGNALEN PER LAND")
+            st.bar_chart(pd.Series(per_land, name="Positief"), color="#3FE0C5",
+                         height=60 + 34 * len(per_land), horizontal=True)
+    else:
+        st.caption("De grafieken verschijnen zodra de eerste koopsignalen binnenkomen.")
     st.markdown("---")
     if not LOGBOEK:
         st.info("Nog geen rondes in het logboek. Na de volgende automatische ronde staat hier "
