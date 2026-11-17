@@ -172,7 +172,7 @@ menu = st.sidebar.radio("Navigatie", [
 leads = st.session_state.leads
 st.sidebar.markdown("---")
 st.sidebar.metric("Totaal gemaild", TOTAAL_VERSTUURD)
-st.sidebar.metric("Interesse", sum(1 for a in ANTWOORDEN if not a.get("afmelding")))
+st.sidebar.metric("Positieve reacties", sum(1 for a in ANTWOORDEN if not a.get("afmelding")))
 st.sidebar.metric("Gevonden (hier)", len(leads))
 if len(leads):
     st.sidebar.metric("Verstuurd", int((leads["Status"] == "Verstuurd").sum()))
@@ -283,12 +283,13 @@ cockpit_kop()
 # ---------------------------------------------------------------------------
 if menu == "Logboek":
     st.title("Logboek")
-    st.subheader(f"Interesse van winkels ({sum(1 for a in ANTWOORDEN if not a.get('afmelding'))})")
+    st.subheader(f"Reacties van winkels · {sum(1 for a in ANTWOORDEN if not a.get('afmelding'))} positief · "
+                 f"{sum(1 for a in ANTWOORDEN if a.get('afmelding'))} negatief")
     if not ANTWOORDEN:
         st.caption("Nog geen reacties. Elke ochtend kijkt de afdeling Search & Analyze of er winkels "
                    "gereageerd hebben; die verschijnen dan hier.")
     for a in ANTWOORDEN:
-        soort = "AFMELDING" if a.get("afmelding") else "INTERESSE"
+        soort = "NEGATIEF" if a.get("afmelding") else "POSITIEF"
         with st.expander(f"{soort} · {a.get('datum', '')} · {a.get('naam') or a.get('van')}", expanded=not a.get("afmelding")):
             st.caption(f"{a.get('van')} · {a.get('onderwerp', '')}")
             st.text(a.get("tekst", ""))

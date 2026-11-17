@@ -115,7 +115,7 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
         stukken = []
         for a in antwoorden:
             kleur = "#9aa0a6" if a.get("afmelding") else "#3FE0C5"
-            label = "AFMELDING" if a.get("afmelding") else "INTERESSE"
+            label = "NEGATIEF" if a.get("afmelding") else "POSITIEF"
             stukken.append(f"""<tr><td style="padding:0 0 14px;">
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f1a22;border-left:4px solid {kleur};">
   <tr><td style="padding:14px 16px;font-family:{TYPEMACHINE};color:{PAPIER};">
@@ -125,7 +125,9 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
    <div style="font-family:{SCHREEF};font-size:15px;line-height:1.55;margin-top:10px;">{_alinea(a.get('tekst', '')[:700])}</div>
   </td></tr></table></td></tr>""")
         echt_int = sum(1 for a in antwoorden if not a.get("afmelding"))
-        kop_interesse = f"INTERESSE VAN WINKELS ({echt_int})" if echt_int else "AFMELDINGEN"
+        neg = len(antwoorden) - echt_int
+        kop_interesse = " &middot; ".join(x for x in [f"POSITIEVE REACTIES ({echt_int})" if echt_int else "",
+                                                      f"NEGATIEVE REACTIES ({neg})" if neg else ""] if x)
         blok = (f'<tr><td style="font-family:{TYPEMACHINE};font-size:13px;letter-spacing:4px;color:#3FE0C5;'
                 f'padding:0 0 12px;">{kop_interesse}</td></tr>' + "".join(stukken)
                 + '<tr><td style="height:14px;"></td></tr>')

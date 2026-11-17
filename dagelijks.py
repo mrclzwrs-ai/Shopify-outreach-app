@@ -196,14 +196,14 @@ def main():
         f"De afdeling Search & Analyze heeft vandaag {len(leads)} winkels voor je gevonden en verwerkt.",
         f"Stand: {'ECHT – deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
         f"Winkels met een echt e-mailadres: {len(leads)}",
-        f"Interesse van winkels: {sum(1 for a in nieuwe_antwoorden if not a['afmelding'])}",
+        f"Positieve reacties: {sum(1 for a in nieuwe_antwoorden if not a['afmelding'])} | negatieve reacties: {sum(1 for a in nieuwe_antwoorden if a['afmelding'])}",
         f"Persoonlijke mails door de Analyzer: {sum(1 for m in mails if m[2])} van {len(mails)}",
         f"Overgeslagen: {len(overgeslagen)} (geen adres, geen Shopify, te klein of al eerder contact)",
         f"Zoekopdrachten gebruikt: {gebruikt}",
         "",
     ]
     for a in nieuwe_antwoorden:
-        regels += [f"{'AFMELDING' if a['afmelding'] else 'INTERESSE'} van {a['naam'] or a['van']} <{a['van']}> – {a['datum']}",
+        regels += [f"{'NEGATIEF' if a['afmelding'] else 'POSITIEF'} van {a['naam'] or a['van']} <{a['van']}> – {a['datum']}",
                    f"Onderwerp: {a['onderwerp']}", a["tekst"][:600], ""]
     for lead, status in resultaten:
         regels.append(f"- {lead['winkelnaam']} | {lead['website']} | {lead['email']} | "
@@ -227,7 +227,7 @@ def main():
         dossier_html = None
     ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Nocturo · Afdeling Search & Analyze", rapport_naar,
                                    f"Ochtendrapport {date.today().strftime('%d-%m')}: "
-                                   + (f"INTERESSE van {n_int} winkel(s) + " if (n_int := sum(1 for a in nieuwe_antwoorden if not a['afmelding'])) else "")
+                                   + (f"{n_pos} positieve reactie(s) + " if (n_pos := sum(1 for a in nieuwe_antwoorden if not a['afmelding'])) else "")
                                    + f"{len(leads)} dossiers ({stand})",
                                    rapport, afmeldbaar=False, html_tekst=dossier_html)
     print("Overzicht gemaild:", ok, "" if ok else melding)
