@@ -133,13 +133,28 @@ def laad_logboek():
     for pad in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logboek", "*.json")), reverse=True):
         try:
             with open(pad, encoding="utf-8") as f:
-                dagen.append(_json.load(f))
+                inhoud = _json.load(f)
+            if isinstance(inhoud, dict) and "rondes" in inhoud:
+                dagen.append(inhoud)
         except Exception:
             pass
     return dagen
 
 
 LOGBOEK = laad_logboek()
+
+
+def laad_antwoorden():
+    import json as _json
+    pad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logboek", "antwoorden.json")
+    try:
+        with open(pad, encoding="utf-8") as f:
+            return list(reversed(_json.load(f)))
+    except Exception:
+        return []
+
+
+ANTWOORDEN = laad_antwoorden()
 TOTAAL_VERSTUURD = sum(1 for d in LOGBOEK for r in d.get("rondes", []) for w in r.get("winkels", [])
                        if w.get("status") == "verstuurd")
 
@@ -157,6 +172,7 @@ menu = st.sidebar.radio("Navigatie", [
 leads = st.session_state.leads
 st.sidebar.markdown("---")
 st.sidebar.metric("Totaal gemaild", TOTAAL_VERSTUURD)
+st.sidebar.metric("Antwoorden", len(ANTWOORDEN))
 st.sidebar.metric("Gevonden (hier)", len(leads))
 if len(leads):
     st.sidebar.metric("Verstuurd", int((leads["Status"] == "Verstuurd").sum()))
@@ -267,6 +283,18 @@ cockpit_kop()
 # ---------------------------------------------------------------------------
 if menu == "Logboek":
     st.title("Logboek")
+    st.subheader(f"Antwoorden van winkels ({len(ANTWOORDEN)})")
+    if not ANTWOORDEN:
+        st.caption("Nog geen antwoorden. Elke ochtend kijkt de afdeling Search & Analyze of er winkels "
+                   "gereageerd hebben; die verschijnen dan hier.")
+    for a in ANTWOORDEN:
+        soort = "AFMELDING" if a.get("afmelding") else "ANTWOORD"
+        with st.expander(f"{soort} · {a.get('datum', '')} · {a.get('naam') or a.get('van')}", expanded=not a.get("afmelding")):
+            st.caption(f"{a.get('van')} · {a.get('onderwerp', '')}")
+            st.text(a.get("tekst", ""))
+            if a.get("afmelding"):
+                st.caption("Deze winkel krijgt nooit meer een mail van de app.")
+    st.markdown("---")
     if not LOGBOEK:
         st.info("Nog geen rondes in het logboek. Na de volgende automatische ronde staat hier "
                 "precies welke winkels gemaild zijn, met de brief die ze kregen.")

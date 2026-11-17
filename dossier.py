@@ -52,7 +52,7 @@ def _stempel(tekst, kleur):
             f'padding:4px 10px;">{_e(tekst)}</span>')
 
 
-def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markten, vandaag=None):
+def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markten, vandaag=None, antwoorden=None):
     """
     leads: lijst met winkel-dicts; mails: lijst (onderwerp, tekst, rapport);
     statussen: lijst met de status per winkel (verstuurd / proef / mislukt).
@@ -110,6 +110,24 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
         kaarten.append(f'<tr><td style="font-family:{TYPEMACHINE};color:{PAPIER};padding:20px 0;">'
                        f'Vandaag geen nieuwe zaken gevonden.</td></tr>')
 
+    blok = ""
+    if antwoorden:
+        stukken = []
+        for a in antwoorden:
+            kleur = "#9aa0a6" if a.get("afmelding") else "#3FE0C5"
+            label = "AFMELDING" if a.get("afmelding") else "ANTWOORD"
+            stukken.append(f"""<tr><td style="padding:0 0 14px;">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f1a22;border-left:4px solid {kleur};">
+  <tr><td style="padding:14px 16px;font-family:{TYPEMACHINE};color:{PAPIER};">
+   <div style="font-size:11px;letter-spacing:3px;color:{kleur};">{label} &middot; {_e(a.get('datum', ''))}</div>
+   <div style="font-family:{SCHREEF};font-size:17px;font-weight:bold;margin:6px 0 2px;">{_e(a.get('naam') or a.get('van', ''))}</div>
+   <div style="font-size:12px;color:#b9b2a1;">{_e(a.get('van', ''))} &middot; {_e(a.get('onderwerp', ''))}</div>
+   <div style="font-family:{SCHREEF};font-size:15px;line-height:1.55;margin-top:10px;">{_alinea(a.get('tekst', '')[:700])}</div>
+  </td></tr></table></td></tr>""")
+        blok = (f'<tr><td style="font-family:{TYPEMACHINE};font-size:13px;letter-spacing:4px;color:#3FE0C5;'
+                f'padding:0 0 12px;">BEET! {len(antwoorden)} NIEUW(E) ANTWOORD(EN)</td></tr>' + "".join(stukken)
+                + '<tr><td style="height:14px;"></td></tr>')
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
@@ -134,6 +152,7 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
   <div style="margin-top:16px;font-family:{TYPEMACHINE};font-size:13px;color:{'#e8a598' if echt else '#b9b2a1'};">{stand_tekst}</div>
  </td></tr>
  <tr><td style="height:26px;"></td></tr>
+ {blok}
  {"".join(kaarten)}
  <tr><td style="font-family:{TYPEMACHINE};font-size:11px;color:#8a8f96;letter-spacing:2px;text-align:center;padding-top:6px;">
   EINDE RAPPORT &middot; ALLEEN OPENBARE BEDRIJFSINFORMATIE GEBRUIKT</td></tr>

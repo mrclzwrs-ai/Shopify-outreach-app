@@ -725,6 +725,99 @@ def bekende_contacten(smtp_user, wachtwoord, imap_server="imap.gmail.com", maand
     return adressen, domeinen, None
 
 
+AFMELD_WOORDEN = ("unsubscribe", "afmelden", "uitschrijven", "remove me", "no thanks", "not interested",
+                  "geen interesse", "abmelden", "kein interesse", "darse de baja", "no me interesa")
+
+
+def _tekst_uit_bericht(bericht):
+    """Haalt de leesbare tekst uit een mail (zonder het geciteerde origineel)."""
+    tekst = ""
+    delen = bericht.walk() if bericht.is_multipart() else [bericht]
+    for deel in delen:
+        if deel.get_content_type() == "text/plain" and not deel.get("Content-Disposition", "").startswith("attachment"):
+            try:
+                tekst = deel.get_payload(decode=True).decode(deel.get_content_charset() or "utf-8", errors="ignore")
+                break
+            except Exception:
+                pass
+    if not tekst:
+        for deel in delen:
+            if deel.get_content_type() == "text/html":
+                try:
+                    ruw = deel.get_payload(decode=True).decode(deel.get_content_charset() or "utf-8", errors="ignore")
+                    tekst = re.sub(r"<[^>]+>", " ", ruw)
+                    break
+                except Exception:
+                    pass
+    regels = []
+    for regel in tekst.splitlines():
+        r = regel.strip()
+        if r.startswith(">") or re.match(r"^(On .+wrote:|Op .+schreef|Am .+schrieb|El .+escribió|-----Original|From:|Van:)", r):
+            break
+        regels.append(r)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(regels)).strip()
+
+
+def zoek_antwoorden(smtp_user, wachtwoord, imap_server="imap.gmail.com", dagen=4, maanden=24):
+    """
+    Zoekt in de inbox naar antwoorden van winkels die we eerder gemaild hebben.
+    Geeft (lijst met antwoorden, foutmelding of None) terug.
+    Elk antwoord: {id, van, naam, domein, onderwerp, datum, tekst, afmelding}
+    """
+    import email as _email
+    sinds = datetime.now() - timedelta(days=30 * maanden)
+    try:
+        imap = imaplib.IMAP4_SSL(imap_server, 993, timeout=30)
+        imap.login(smtp_user.strip(), wachtwoord.replace(" ", "").strip())
+    except Exception as ex:
+        return [], f"Kon de mailbox niet openen: {ex}"
+    antwoorden = []
+    eigen = smtp_user.lower().strip()
+    try:
+        verzonden_map = _map_met_vlag(imap, "\\Sent") or "[Gmail]/Sent Mail"
+        gemaild = _verzamel(imap, verzonden_map, "TO", sinds)
+        gemaild.discard(eigen)
+        gemaild_dom = {a.split("@")[1] for a in gemaild if "@" in a and a.split("@")[1] not in GRATIS_MAIL
+                       and a.split("@")[1] != eigen.split("@")[1]}
+        typ, _ = imap.select("INBOX", readonly=True)
+        if typ != "OK":
+            return [], "Inbox niet gevonden"
+        recent = (datetime.now() - timedelta(days=dagen)).strftime("%d-%b-%Y")
+        typ, data = imap.search(None, "SINCE", recent)
+        nummers = data[0].split() if typ == "OK" and data and data[0] else []
+        for nr in nummers:
+            typ, resp = imap.fetch(nr, "(BODY.PEEK[])")
+            if typ != "OK" or not resp or not isinstance(resp[0], tuple):
+                continue
+            bericht = _email.message_from_bytes(resp[0][1])
+            naam, adres = email.utils.parseaddr(str(make_header(decode_header(bericht.get("From", "")))))
+            adres = adres.lower()
+            dom = adres.split("@")[1] if "@" in adres else ""
+            if not adres or adres == eigen or not (adres in gemaild or dom in gemaild_dom):
+                continue
+            onderwerp = str(make_header(decode_header(bericht.get("Subject", ""))))
+            tekst = _tekst_uit_bericht(bericht)
+            try:
+                datum = email.utils.parsedate_to_datetime(bericht.get("Date")).strftime("%d-%m-%Y %H:%M")
+            except Exception:
+                datum = ""
+            klein = (onderwerp + " " + tekst[:400]).lower()
+            antwoorden.append({
+                "id": (bericht.get("Message-ID") or f"{adres}-{datum}").strip(),
+                "van": adres, "naam": naam, "domein": dom, "onderwerp": onderwerp, "datum": datum,
+                "tekst": tekst[:1500],
+                "afmelding": any(w in klein for w in AFMELD_WOORDEN),
+            })
+    except Exception as ex:
+        return antwoorden, f"Antwoorden zoeken mislukt: {ex}"
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+    return antwoorden, None
+
+
 def al_bekend(adres, domein, bekende_adressen, bekende_domeinen):
     adres = (adres or "").lower()
     if adres in bekende_adressen:

@@ -26,6 +26,24 @@ def omgeving(naam, standaard=None):
     return waarde or standaard
 
 
+def bewaar_antwoorden(gevonden):
+    """Bewaart antwoorden in logboek/antwoorden.json en geeft alleen de nieuwe terug."""
+    os.makedirs("logboek", exist_ok=True)
+    pad = os.path.join("logboek", "antwoorden.json")
+    alle = []
+    if os.path.exists(pad):
+        with open(pad, encoding="utf-8") as f:
+            alle = json.load(f)
+    bekend = {a["id"] for a in alle}
+    nieuw = [a for a in gevonden if a["id"] not in bekend]
+    for a in nieuw:
+        a["binnen"] = date.today().isoformat()
+    if nieuw:
+        with open(pad, "w", encoding="utf-8") as f:
+            json.dump(alle + nieuw, f, ensure_ascii=False, indent=1)
+    return nieuw
+
+
 def bewaar_logboek(stand, resultaten, mails, overgeslagen, zoekopdrachten):
     """Schrijft het rapport van deze ronde naar logboek/JJJJ-MM-DD.json."""
     os.makedirs("logboek", exist_ok=True)
@@ -93,6 +111,17 @@ def main():
             print("Veiligheidshalve wordt er vandaag niets verstuurd.")
             stand = "proef"
     print(f"Al bekend in de mailbox: {len(adressen)} adressen, {len(domeinen)} domeinen")
+
+    # Antwoorden van winkels (nieuw sinds de vorige keer)
+    nieuwe_antwoorden = []
+    try:
+        gevonden, afout = oc.zoek_antwoorden(smtp_user, wachtwoord)
+        if afout:
+            print(afout)
+        nieuwe_antwoorden = bewaar_antwoorden(gevonden)
+        print(f"Nieuwe antwoorden van winkels: {len(nieuwe_antwoorden)}")
+    except Exception as ex:
+        print("Antwoorden ophalen mislukt:", ex)
 
     leads, overgeslagen, gebruikt = [], [], 0
     if bron != "google":
@@ -167,11 +196,15 @@ def main():
         f"De afdeling Search & Analyze heeft vandaag {len(leads)} winkels voor je gevonden en verwerkt.",
         f"Stand: {'ECHT – deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
         f"Winkels met een echt e-mailadres: {len(leads)}",
+        f"Nieuwe antwoorden van winkels: {len(nieuwe_antwoorden)}",
         f"Persoonlijke mails door de Analyzer: {sum(1 for m in mails if m[2])} van {len(mails)}",
         f"Overgeslagen: {len(overgeslagen)} (geen adres, geen Shopify, te klein of al eerder contact)",
         f"Zoekopdrachten gebruikt: {gebruikt}",
         "",
     ]
+    for a in nieuwe_antwoorden:
+        regels += [f"ANTWOORD{' (AFMELDING)' if a['afmelding'] else ''} van {a['naam'] or a['van']} <{a['van']}> – {a['datum']}",
+                   f"Onderwerp: {a['onderwerp']}", a["tekst"][:600], ""]
     for lead, status in resultaten:
         regels.append(f"- {lead['winkelnaam']} | {lead['website']} | {lead['email']} | "
                       f"{oc.MARKTEN.get(lead.get('markt'), {}).get('naam', lead.get('markt'))} | {lead['niche']} | {status}")
@@ -187,13 +220,15 @@ def main():
 
     try:
         dossier_html = dossier.maak_dossier_html(stand, [l for l, _ in resultaten], mails,
-                                                 [s for _, s in resultaten], len(overgeslagen), oc.MARKTEN)
+                                                 [s for _, s in resultaten], len(overgeslagen), oc.MARKTEN,
+                                                 antwoorden=nieuwe_antwoorden)
     except Exception as ex:  # opmaak mag het overzicht nooit tegenhouden
         print("Dossier-opmaak mislukt, gewone tekst gebruikt:", ex)
         dossier_html = None
     ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Nocturo · Afdeling Search & Analyze", rapport_naar,
                                    f"Ochtendrapport {date.today().strftime('%d-%m')}: "
-                                   f"{len(leads)} dossiers ({stand})",
+                                   + (f"{len(nieuwe_antwoorden)} ANTWOORD(EN) + " if nieuwe_antwoorden else "")
+                                   + f"{len(leads)} dossiers ({stand})",
                                    rapport, afmeldbaar=False, html_tekst=dossier_html)
     print("Overzicht gemaild:", ok, "" if ok else melding)
 
