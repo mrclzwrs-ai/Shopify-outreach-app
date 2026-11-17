@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 
@@ -125,8 +126,28 @@ def bekende_contacten():
 
 
 # ---------------------------------------------------------------------------
+# Logboek: de rapporten van de automatische rondes (logboek/JJJJ-MM-DD.json).
+def laad_logboek():
+    import glob, json as _json
+    dagen = []
+    for pad in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logboek", "*.json")), reverse=True):
+        try:
+            with open(pad, encoding="utf-8") as f:
+                dagen.append(_json.load(f))
+        except Exception:
+            pass
+    return dagen
+
+
+LOGBOEK = laad_logboek()
+TOTAAL_VERSTUURD = sum(1 for d in LOGBOEK for r in d.get("rondes", []) for w in r.get("winkels", [])
+                       if w.get("status") == "verstuurd")
+
+
+# ---------------------------------------------------------------------------
 st.sidebar.title("SHOPREELS / OUTREACH")
 menu = st.sidebar.radio("Navigatie", [
+    "Logboek",
     "Winkels zoeken",
     "Versturen",
     "De mail",
@@ -135,7 +156,8 @@ menu = st.sidebar.radio("Navigatie", [
 ])
 leads = st.session_state.leads
 st.sidebar.markdown("---")
-st.sidebar.metric("Gevonden", len(leads))
+st.sidebar.metric("Totaal gemaild", TOTAAL_VERSTUURD)
+st.sidebar.metric("Gevonden (hier)", len(leads))
 if len(leads):
     st.sidebar.metric("Verstuurd", int((leads["Status"] == "Verstuurd").sum()))
 
@@ -241,8 +263,61 @@ tik(); setInterval(tik, 1000);
 cockpit_kop()
 
 
+
 # ---------------------------------------------------------------------------
-if menu == "Winkels zoeken":
+if menu == "Logboek":
+    st.title("Logboek")
+    if not LOGBOEK:
+        st.info("Nog geen rondes in het logboek. Na de volgende automatische ronde staat hier "
+                "precies welke winkels gemaild zijn, met de brief die ze kregen.")
+    else:
+        vandaag = LOGBOEK[0]
+        alle = [w for d in LOGBOEK for r in d.get("rondes", []) for w in r.get("winkels", [])]
+        verstuurd = [w for w in alle if w.get("status") == "verstuurd"]
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Laatste ronde", sum(len(r.get("winkels", [])) for r in vandaag.get("rondes", [])))
+        k2.metric("Totaal gemaild", len(verstuurd))
+        k3.metric("Landen", len({w.get("land") for w in verstuurd}) if verstuurd else 0)
+        k4.metric("Dagen actief", len(LOGBOEK))
+
+        per_land = {}
+        for w in verstuurd:
+            naam = oc.MARKTEN.get(w.get("land"), {}).get("naam", w.get("land") or "?")
+            per_land[naam] = per_land.get(naam, 0) + 1
+        if per_land:
+            st.caption("GEMAILD PER LAND")
+            st.bar_chart(pd.Series(per_land, name="Winkels"), color="#3FE0C5", height=60 + 34 * len(per_land), horizontal=True)
+
+        for dag in LOGBOEK:
+            d = dag.get("datum", "")
+            try:
+                label = pd.Timestamp(d).strftime("%d-%m-%Y")
+            except Exception:
+                label = d
+            for ronde in reversed(dag.get("rondes", [])):
+                winkels = ronde.get("winkels", [])
+                echt = ronde.get("stand") == "echt"
+                st.markdown(f"### {label} · {ronde.get('tijd', '')} · "
+                            f"{'ECHT' if echt else 'PROEF'} · {len(winkels)} winkels")
+                if not winkels:
+                    st.caption("Geen nieuwe winkels gevonden in deze ronde.")
+                tabel = pd.DataFrame([{
+                    "Winkel": w.get("winkel"), "Land": oc.MARKTEN.get(w.get("land"), {}).get("naam", w.get("land")),
+                    "E-mail": w.get("email"), "Status": w.get("status")} for w in winkels])
+                if len(tabel):
+                    st.dataframe(tabel, hide_index=True, use_container_width=True)
+                for w in winkels:
+                    with st.expander(f"{w.get('winkel')} — {w.get('website')}"):
+                        if w.get("detective"):
+                            st.caption("Detective: " + w["detective"])
+                        if w.get("rapport"):
+                            st.markdown("**Rapport**")
+                            st.text(w["rapport"])
+                        st.markdown(f"**Onderwerp:** {w.get('onderwerp', '')}")
+                        st.text(w.get("mail", ""))
+
+# ---------------------------------------------------------------------------
+elif menu == "Winkels zoeken":
     st.title("Winkels zoeken")
 
     bron = st.radio("Waar zoeken?", ["Shopify-lijst (gratis, alle soorten winkels)", "Google (kost zoekopdrachten)"],

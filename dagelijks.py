@@ -9,11 +9,12 @@ Dagelijkse automatische run (wordt elke dag door GitHub gestart, zie
 De stand en het aantal mails per dag staan in instellingen.json.
 """
 
+import json
 import os
 import random
 import sys
 import time
-from datetime import date
+from datetime import date, datetime
 
 import detective
 import dossier
@@ -23,6 +24,40 @@ import outreach_core as oc
 def omgeving(naam, standaard=None):
     waarde = os.environ.get(naam, "").strip()
     return waarde or standaard
+
+
+def bewaar_logboek(stand, resultaten, mails, overgeslagen, zoekopdrachten):
+    """Schrijft het rapport van deze ronde naar logboek/JJJJ-MM-DD.json."""
+    os.makedirs("logboek", exist_ok=True)
+    pad = os.path.join("logboek", date.today().isoformat() + ".json")
+    rondes = []
+    if os.path.exists(pad):
+        with open(pad, encoding="utf-8") as f:
+            rondes = json.load(f).get("rondes", [])
+    winkels = []
+    for (lead, status), (onderwerp, tekst, rapportje) in zip(resultaten, mails):
+        winkels.append({
+            "winkel": lead.get("winkelnaam", ""),
+            "website": lead.get("website", ""),
+            "email": lead.get("email", ""),
+            "land": lead.get("markt", ""),
+            "soort": lead.get("niche", ""),
+            "status": status,
+            "detective": lead.get("detective", ""),
+            "rapport": rapportje or "",
+            "onderwerp": onderwerp,
+            "mail": tekst,
+        })
+    rondes.append({
+        "tijd": datetime.now().strftime("%H:%M"),
+        "stand": stand,
+        "overgeslagen": overgeslagen,
+        "zoekopdrachten": zoekopdrachten,
+        "winkels": winkels,
+    })
+    with open(pad, "w", encoding="utf-8") as f:
+        json.dump({"datum": date.today().isoformat(), "rondes": rondes}, f, ensure_ascii=False, indent=1)
+    print("Logboek opgeslagen:", pad)
 
 
 def main():
@@ -119,6 +154,12 @@ def main():
                 time.sleep(random.uniform(45, 120))  # rustig aan, niet als spam overkomen
     else:
         resultaten = [(lead, "proef – niet verstuurd") for lead in leads]
+
+    # Logboek opslaan, zodat het rapport ook in de app zelf te zien is.
+    try:
+        bewaar_logboek(stand, resultaten, mails, len(overgeslagen), gebruikt)
+    except Exception as ex:  # het logboek mag de rest nooit tegenhouden
+        print("Logboek opslaan mislukt:", ex)
 
     # Overzicht naar jezelf
     regels = [
