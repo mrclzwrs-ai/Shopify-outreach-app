@@ -126,8 +126,7 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
   </td></tr></table></td></tr>""")
         echt_int = sum(1 for a in antwoorden if not a.get("afmelding"))
         neg = len(antwoorden) - echt_int
-        kop_interesse = " &middot; ".join(x for x in [f"POSITIEVE REACTIES ({echt_int})" if echt_int else "",
-                                                      f"NEGATIEVE REACTIES ({neg})" if neg else ""] if x)
+        kop_interesse = f"KOOPSIGNALEN &middot; {echt_int} POSITIEF &middot; {neg} NEGATIEF"
         blok = (f'<tr><td style="font-family:{TYPEMACHINE};font-size:13px;letter-spacing:4px;color:#3FE0C5;'
                 f'padding:0 0 12px;">{kop_interesse}</td></tr>' + "".join(stukken)
                 + '<tr><td style="height:14px;"></td></tr>')
