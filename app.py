@@ -309,7 +309,7 @@ if menu == "Logboek":
                 for w in winkels:
                     with st.expander(f"{w.get('winkel')} — {w.get('website')}"):
                         if w.get("detective"):
-                            st.caption("Medewerker: " + w["detective"])
+                            st.caption("Analyzer: " + w["detective"])
                         if w.get("rapport"):
                             st.markdown("**Rapport**")
                             st.text(w["rapport"])

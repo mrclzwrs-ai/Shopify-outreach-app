@@ -137,7 +137,7 @@ def main():
     print(f"Gevonden: {len(leads)} winkels met een echt adres ({gebruikt} zoekopdrachten)")
 
     # De detective schrijft per winkel een persoonlijke mail (of valt terug op de standaardmail).
-    print("Medewerker aan het werk" + ("" if ai_sleutel else " (geen AI-sleutel: standaardmails)"))
+    print("Analyzer aan het werk" + ("" if ai_sleutel else " (geen AI-sleutel: standaardmails)"))
     mails = []
     for lead in leads:
         onderwerp, tekst, rapportje = detective.maak_beste_mail(lead, afzender, link, ai_sleutel)
@@ -163,10 +163,11 @@ def main():
 
     # Overzicht naar jezelf
     regels = [
-        f"Outreach-overzicht {date.today().strftime('%d-%m-%Y')}",
+        f"Ochtendrapport {date.today().strftime('%d-%m-%Y')} – Nocturo, afdeling Search & Analyze",
+        f"De afdeling Search & Analyze heeft vandaag {len(leads)} winkels voor je gevonden en verwerkt.",
         f"Stand: {'ECHT – deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
         f"Winkels met een echt e-mailadres: {len(leads)}",
-        f"Persoonlijke mails door je medewerker: {sum(1 for m in mails if m[2])} van {len(mails)}",
+        f"Persoonlijke mails door de Analyzer: {sum(1 for m in mails if m[2])} van {len(mails)}",
         f"Overgeslagen: {len(overgeslagen)} (geen adres, geen Shopify, te klein of al eerder contact)",
         f"Zoekopdrachten gebruikt: {gebruikt}",
         "",
@@ -177,7 +178,7 @@ def main():
     # Alle mails voluit, zodat je ze kunt meelezen.
     for (lead, _), (onderwerp, tekst, rapportje) in zip(resultaten, mails):
         regels += ["", "=" * 60, f"{lead['winkelnaam']} – {lead['website']} – aan: {lead['email']}"]
-        regels.append(f"Medewerker: {lead.get('detective', '')}")
+        regels.append(f"Analyzer: {lead.get('detective', '')}")
         if rapportje:
             regels += ["", "RAPPORT:", rapportje]
         regels += ["", f"Onderwerp: {onderwerp}", "", tekst]
@@ -190,7 +191,7 @@ def main():
     except Exception as ex:  # opmaak mag het overzicht nooit tegenhouden
         print("Dossier-opmaak mislukt, gewone tekst gebruikt:", ex)
         dossier_html = None
-    ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Nocturo Search & Analyze", rapport_naar,
+    ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Nocturo · Afdeling Search & Analyze", rapport_naar,
                                    f"Ochtendrapport {date.today().strftime('%d-%m')}: "
                                    f"{len(leads)} dossiers ({stand})",
                                    rapport, afmeldbaar=False, html_tekst=dossier_html)
