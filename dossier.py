@@ -125,7 +125,7 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
    <div style="font-family:{SCHREEF};font-size:15px;line-height:1.55;margin-top:10px;">{_alinea(a.get('tekst', '')[:700])}</div>
   </td></tr></table></td></tr>""")
         blok = (f'<tr><td style="font-family:{TYPEMACHINE};font-size:13px;letter-spacing:4px;color:#3FE0C5;'
-                f'padding:0 0 12px;">BEET! {len(antwoorden)} NIEUW(E) ANTWOORD(EN)</td></tr>' + "".join(stukken)
+                f'padding:0 0 12px;">{"NIEUWE REACTIE VAN EEN WINKEL" if len(antwoorden) == 1 else f"NIEUWE REACTIES VAN WINKELS ({len(antwoorden)})"}</td></tr>' + "".join(stukken)
                 + '<tr><td style="height:14px;"></td></tr>')
 
     return f"""<!DOCTYPE html>

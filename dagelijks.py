@@ -227,7 +227,7 @@ def main():
         dossier_html = None
     ok, melding = oc.verstuur_mail(smtp_user, wachtwoord, "Nocturo · Afdeling Search & Analyze", rapport_naar,
                                    f"Ochtendrapport {date.today().strftime('%d-%m')}: "
-                                   + (f"{len(nieuwe_antwoorden)} ANTWOORD(EN) + " if nieuwe_antwoorden else "")
+                                   + (f"{len(nieuwe_antwoorden)} nieuwe reactie(s) + " if nieuwe_antwoorden else "")
                                    + f"{len(leads)} dossiers ({stand})",
                                    rapport, afmeldbaar=False, html_tekst=dossier_html)
     print("Overzicht gemaild:", ok, "" if ok else melding)
