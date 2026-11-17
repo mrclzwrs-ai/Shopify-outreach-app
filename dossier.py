@@ -119,7 +119,7 @@ def maak_dossier_html(stand, leads, mails, statussen, aantal_overgeslagen, markt
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;">
  <tr><td style="padding:0 0 26px;border-bottom:1px solid #4a5058;">
   <div style="background:{ROOD};color:#fff;font-family:{TYPEMACHINE};font-size:11px;letter-spacing:6px;text-align:center;padding:5px 0;">VERTROUWELIJK &middot; ALLEEN VOOR INTERN GEBRUIK</div>
-  <div style="font-family:{TYPEMACHINE};font-size:12px;letter-spacing:4px;color:#b9b2a1;margin-top:20px;">DE BEDRIJFSDETECTIVE &middot; AFDELING ONDERZOEK</div>
+  <div style="font-family:{TYPEMACHINE};font-size:12px;letter-spacing:4px;color:#b9b2a1;margin-top:20px;">NOCTURO &middot; JE VERKOOPTEAM &middot; ONDERZOEK</div>
   <div style="font-family:{SCHREEF};font-size:30px;font-weight:bold;color:{PAPIER};margin:6px 0 4px;">Ochtendrapport</div>
   <div style="font-family:{TYPEMACHINE};font-size:14px;color:#d6cfbd;">{datum}</div>
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:18px;"><tr>

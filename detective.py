@@ -31,7 +31,7 @@ import outreach_core as oc
 MODEL = os.environ.get("DETECTIVE_MODEL", "claude-sonnet-5-5")
 API_URL = "https://api.anthropic.com/v1/messages"
 MAX_TEKST = 9000          # zoveel tekens van de site sturen we maximaal naar de AI
-BOT_NAAM = "ShopReelsDetective"
+BOT_NAAM = "NocturoBot"
 
 TAALNAAM = {"NL": "Nederlands", "EN": "Engels", "DE": "Duits", "ES": "Spaans"}
 

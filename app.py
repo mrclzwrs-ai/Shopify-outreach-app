@@ -145,7 +145,7 @@ TOTAAL_VERSTUURD = sum(1 for d in LOGBOEK for r in d.get("rondes", []) for w in 
 
 
 # ---------------------------------------------------------------------------
-st.sidebar.title("SHOPREELS / OUTREACH")
+st.sidebar.title("NOCTURO / SEARCH & ANALYZE")
 menu = st.sidebar.radio("Navigatie", [
     "Logboek",
     "Winkels zoeken",
@@ -309,7 +309,7 @@ if menu == "Logboek":
                 for w in winkels:
                     with st.expander(f"{w.get('winkel')} — {w.get('website')}"):
                         if w.get("detective"):
-                            st.caption("Detective: " + w["detective"])
+                            st.caption("Medewerker: " + w["detective"])
                         if w.get("rapport"):
                             st.markdown("**Rapport**")
                             st.text(w["rapport"])
