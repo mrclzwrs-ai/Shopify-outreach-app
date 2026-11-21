@@ -185,7 +185,7 @@ if len(leads):
 def cockpit_kop():
     stand = INST.get("stand", "proef")
     stand_kleur = "#3FE0C5" if stand == "echt" else "#F5A623"
-    stand_tekst = "ECHT · MAILS GAAN NAAR WINKELS" if stand == "echt" else "PROEF · ALLEEN OVERZICHT NAAR JOU"
+    stand_tekst = "ACTIEF · MAILS GAAN NAAR WINKELS" if stand == "echt" else "PROEF · ALLEEN OVERZICHT NAAR JOU"
     per_dag = INST.get("mails_per_dag", 10)
     landen = len(INST.get("markten", []))
     st.iframe(f"""
@@ -379,7 +379,7 @@ if menu == "Logboek":
                 winkels = ronde.get("winkels", [])
                 echt = ronde.get("stand") == "echt"
                 st.markdown(f"### {label} · {ronde.get('tijd', '')} · "
-                            f"{'ECHT' if echt else 'PROEF'} · {len(winkels)} winkels")
+                            f"{'' if echt else 'PROEF · '}{len(winkels)} winkels")
                 if not winkels:
                     st.caption("Geen nieuwe winkels gevonden in deze ronde.")
                 tabel = pd.DataFrame([{
@@ -474,7 +474,7 @@ elif menu == "Winkels zoeken":
                 "Domein": l["domein"],
             } for l in gevonden])
             st.session_state.leads = pd.concat([st.session_state.leads, nieuw], ignore_index=True)
-            tekst = f"{len(gevonden)} winkels met een echt adres gevonden. {len(overgeslagen)} overgeslagen."
+            tekst = f"{len(gevonden)} winkels gevonden. {len(overgeslagen)} overgeslagen."
             if not lijst:
                 tekst += f" ({gebruikt} zoekopdrachten gebruikt)"
             st.success(tekst)
@@ -568,7 +568,7 @@ elif menu == "Automatisch":
     st.write("Elke werkdag om ongeveer **9:15** zoekt de app zelf nieuwe winkels "
              "(dat draait bij GitHub, dus je iPad hoeft niet aan te staan).")
     if stand == "echt":
-        st.success(f"Stand: **ECHT**. Er gaan maximaal {INST.get('mails_per_dag')} mails per dag "
+        st.success(f"Stand: **ACTIEF**. Er gaan maximaal {INST.get('mails_per_dag')} mails per dag "
                    "naar winkels. Daarna krijg je een overzicht in je mailbox.")
     else:
         st.info("Stand: **PROEF**. Er gaat nog niets naar winkels. Je krijgt elke werkdag een "

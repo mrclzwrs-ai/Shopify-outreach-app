@@ -163,7 +163,7 @@ def main():
                 print("Fout bij zoeken:", fout)
                 break
 
-    print(f"Gevonden: {len(leads)} winkels met een echt adres ({gebruikt} zoekopdrachten)")
+    print(f"Gevonden: {len(leads)} winkels gevonden ({gebruikt} zoekopdrachten)")
 
     # De detective schrijft per winkel een persoonlijke mail (of valt terug op de standaardmail).
     print("Analyzer aan het werk" + ("" if ai_sleutel else " (geen AI-sleutel: standaardmails)"))
@@ -194,8 +194,8 @@ def main():
     regels = [
         f"Ochtendrapport {date.today().strftime('%d-%m-%Y')} – Nocturo, afdeling Search & Analyze",
         f"De afdeling Search & Analyze heeft vandaag {len(leads)} winkels voor je gevonden en verwerkt.",
-        f"Stand: {'ECHT – deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
-        f"Winkels met een echt e-mailadres: {len(leads)}",
+        f"{'Deze mails zijn verstuurd' if stand == 'echt' else 'PROEF – er is niets naar winkels verstuurd'}",
+        f"Winkels gevonden: {len(leads)}",
         f"Koopsignalen – positief: {sum(1 for a in nieuwe_antwoorden if not a['afmelding'])} | negatief: {sum(1 for a in nieuwe_antwoorden if a['afmelding'])}",
         f"Persoonlijke mails door de Analyzer: {sum(1 for m in mails if m[2])} van {len(mails)}",
         f"Overgeslagen: {len(overgeslagen)} (geen adres, geen Shopify, te klein of al eerder contact)",
