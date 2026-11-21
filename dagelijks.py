@@ -163,7 +163,7 @@ def main():
                 print("Fout bij zoeken:", fout)
                 break
 
-    print(f"Gevonden: {len(leads)} winkels gevonden ({gebruikt} zoekopdrachten)")
+    print(f"Gevonden: {len(leads)} winkels ({gebruikt} zoekopdrachten)")
 
     # De detective schrijft per winkel een persoonlijke mail (of valt terug op de standaardmail).
     print("Analyzer aan het werk" + ("" if ai_sleutel else " (geen AI-sleutel: standaardmails)"))
